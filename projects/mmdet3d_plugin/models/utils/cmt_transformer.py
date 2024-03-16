@@ -11,7 +11,6 @@
 import torch
 from einops import rearrange
 from mmengine.model import BaseModule
-from mmcv.cnn.bricks.transformer import build_transformer_layer_sequence
 from mmengine.model import xavier_init
 from mmdet3d.registry import MODELS
 
@@ -38,10 +37,10 @@ class CmtTransformer(BaseModule):
     def __init__(self, encoder=None, decoder=None, init_cfg=None, cross=False):
         super(CmtTransformer, self).__init__(init_cfg=init_cfg)
         if encoder is not None:
-            self.encoder = build_transformer_layer_sequence(encoder)
+            self.encoder = MODELS.build(encoder)
         else:
             self.encoder = None
-        self.decoder = build_transformer_layer_sequence(decoder)
+        self.decoder = MODELS.build(decoder)
         self.embed_dims = self.decoder.embed_dims
         self.cross = cross
 
@@ -120,10 +119,10 @@ class CmtLidarTransformer(BaseModule):
     def __init__(self, encoder=None, decoder=None, init_cfg=None, cross=False):
         super(CmtLidarTransformer, self).__init__(init_cfg=init_cfg)
         if encoder is not None:
-            self.encoder = build_transformer_layer_sequence(encoder)
+            self.encoder = MODELS.build(encoder)
         else:
             self.encoder = None
-        self.decoder = build_transformer_layer_sequence(decoder)
+        self.decoder = MODELS.build(decoder)
         self.embed_dims = self.decoder.embed_dims
         self.cross = cross
 
@@ -197,10 +196,10 @@ class CmtImageTransformer(BaseModule):
     def __init__(self, encoder=None, decoder=None, init_cfg=None, cross=False):
         super(CmtImageTransformer, self).__init__(init_cfg=init_cfg)
         if encoder is not None:
-            self.encoder = build_transformer_layer_sequence(encoder)
+            self.encoder = MODELS.build(encoder)
         else:
             self.encoder = None
-        self.decoder = build_transformer_layer_sequence(decoder)
+        self.decoder = MODELS.build(decoder)
         self.embed_dims = self.decoder.embed_dims
         self.cross = cross
 

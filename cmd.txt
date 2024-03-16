@@ -2,4 +2,6 @@ docker run --gpus all --shm-size=8g -it -v /media/helloalone/新加卷/ubuntu_co
 
 python train.py projects/configs/fusion/my_cmt.py --auto-scale-lr
 
-python tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag nuscenes --version v1.0-mini --max-sweeps 0
+dist_train.sh projects/configs/fusion/my_cmt.py 2 --auto-scale-lr
+
+python tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag nuscenes --version v1.0-trainval --max-sweeps 0

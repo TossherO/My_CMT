@@ -10,8 +10,7 @@
 
 import torch
 
-from mmdet.models.task_modules import AssignResult
-from mmdet.models.task_modules import BaseAssigner
+from mmdet.models.task_modules import AssignResult, BaseAssigner
 from mmdet3d.registry import TASK_UTILS
 from scipy.optimize import linear_sum_assignment
 

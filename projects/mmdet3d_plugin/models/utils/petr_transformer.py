@@ -1,14 +1,10 @@
 import warnings
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.utils.checkpoint as cp
-from mmcv.cnn.bricks.drop import build_dropout
 from mmengine.model import BaseModule
-from mmcv.cnn.bricks.transformer import (
-    BaseTransformerLayer,
-    TransformerLayerSequence,
-)
+from mmcv.cnn.bricks.transformer import (BaseTransformerLayer,
+                                         TransformerLayerSequence)
 from mmcv.cnn import build_norm_layer
 from mmengine.registry import MODELS
 
@@ -61,7 +57,7 @@ class PETRMultiheadAttention(BaseModule):
                                           **kwargs)
 
         self.proj_drop = nn.Dropout(proj_drop)
-        self.dropout_layer = build_dropout(
+        self.dropout_layer = MODELS.build(
             dropout_layer) if dropout_layer else nn.Identity()
 
     # @deprecated_api_warning({'residual': 'identity'},
@@ -206,7 +202,7 @@ class PETRMultiheadFlashAttention(BaseModule):
                                           **kwargs)
 
         self.proj_drop = nn.Dropout(proj_drop)
-        self.dropout_layer = build_dropout(
+        self.dropout_layer = MODELS.build(
             dropout_layer) if dropout_layer else nn.Identity()
 
     # @deprecated_api_warning({'residual': 'identity'},
