@@ -225,6 +225,7 @@ test_pipeline = [
         color_type='color',
         backend_args=backend_args
     ),
+    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -241,7 +242,7 @@ test_pipeline = [
             dict(type='NormalizeMultiviewImage', **img_norm_cfg),
             dict(type='PadMultiViewImage', size_divisor=32)
         ]),
-        dict(type='Pack3DDetInputs', keys=['points', 'img'])
+    dict(type='Pack3DDetInputs', keys=['points', 'img'])
 ]
 
 train_dataloader = dict(
@@ -264,8 +265,8 @@ train_dataloader = dict(
             # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
             box_type_3d='LiDAR')))
-test_dataloader = dict(
-    batch_size=2,
+val_dataloader = dict(
+    batch_size=1,
     num_workers=4,
     persistent_workers=True,
     drop_last=False,
@@ -277,25 +278,25 @@ test_dataloader = dict(
         pipeline=test_pipeline,
         metainfo=metainfo,
         modality=input_modality,
-        data_prefix=data_prefix,
         test_mode=True,
+        data_prefix=data_prefix,
         box_type_3d='LiDAR',
         backend_args=backend_args))
-val_dataloader = dict(
+test_dataloader = dict(
     batch_size=1,
-    num_workers=1,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='nuscenes_infos_val.pkl',
+        ann_file='nuscenes_infos_test.pkl',
         pipeline=test_pipeline,
         metainfo=metainfo,
         modality=input_modality,
-        test_mode=True,
         data_prefix=data_prefix,
+        test_mode=True,
         box_type_3d='LiDAR',
         backend_args=backend_args))
 
