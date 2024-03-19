@@ -134,13 +134,8 @@ class CmtDetector(MVXTwoStageDetector):
         imgs = batch_inputs_dict.get('imgs', None)
         points = batch_inputs_dict.get('points', None)
         img_metas = [item.metainfo for item in batch_data_samples]
-        gt_bboxes_3d = []
-        gt_labels_3d = []
-        for img_meta in img_metas:
-            img_meta['gt_bboxes_3d'] = img_meta['gt_bboxes_3d'].to(points[0].device)
-            img_meta['gt_labels_3d'] = img_meta['gt_labels_3d'].to(points[0].device)
-            gt_bboxes_3d.append(img_meta['gt_bboxes_3d'])
-            gt_labels_3d.append(img_meta['gt_labels_3d'])
+        gt_bboxes_3d = [item.get('gt_instances_3d')['bboxes_3d'] for item in batch_data_samples]
+        gt_labels_3d = [item.get('gt_instances_3d')['labels_3d'] for item in batch_data_samples]
 
         img_feats, pts_feats = self.extract_feat(
             points, imgs=imgs, img_metas=img_metas)

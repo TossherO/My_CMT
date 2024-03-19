@@ -831,12 +831,17 @@ class CmtHead(BaseModule):
 
         for task_id, preds_dict in enumerate(preds_dicts, 0):
             for dec_id in range(num_decoder):
-                pred_bbox = torch.cat(
-                    (preds_dict[0]['center'][dec_id], preds_dict[0]['height'][dec_id],
-                    preds_dict[0]['dim'][dec_id], preds_dict[0]['rot'][dec_id],
-                    preds_dict[0]['vel'][dec_id]),
-                    dim=-1
-                )
+                if preds_dict[0].get('vel') is not None:
+                    pred_bbox = torch.cat(
+                        (preds_dict[0]['center'][dec_id], preds_dict[0]['height'][dec_id],
+                        preds_dict[0]['dim'][dec_id], preds_dict[0]['rot'][dec_id],
+                        preds_dict[0]['vel'][dec_id]),
+                        dim=-1)
+                else:
+                    pred_bbox = torch.cat(
+                        (preds_dict[0]['center'][dec_id], preds_dict[0]['height'][dec_id],
+                        preds_dict[0]['dim'][dec_id], preds_dict[0]['rot'][dec_id]),
+                        dim=-1)
                 all_pred_bboxes[dec_id].append(pred_bbox)
                 all_pred_logits[dec_id].append(preds_dict[0]['cls_logits'][dec_id])
         all_pred_bboxes = [all_pred_bboxes[idx] for idx in range(num_decoder)]
@@ -863,12 +868,17 @@ class CmtHead(BaseModule):
         dn_mask_dicts = collections.defaultdict(list)
         for task_id, preds_dict in enumerate(preds_dicts, 0):
             for dec_id in range(num_decoder):
-                pred_bbox = torch.cat(
-                    (preds_dict[0]['dn_center'][dec_id], preds_dict[0]['dn_height'][dec_id],
-                    preds_dict[0]['dn_dim'][dec_id], preds_dict[0]['dn_rot'][dec_id],
-                    preds_dict[0]['dn_vel'][dec_id]),
-                    dim=-1
-                )
+                if preds_dict[0].get('dn_vel') is not None:
+                    pred_bbox = torch.cat(
+                        (preds_dict[0]['dn_center'][dec_id], preds_dict[0]['dn_height'][dec_id],
+                        preds_dict[0]['dn_dim'][dec_id], preds_dict[0]['dn_rot'][dec_id],
+                        preds_dict[0]['dn_vel'][dec_id]),
+                        dim=-1)
+                else:
+                    pred_bbox = torch.cat(
+                        (preds_dict[0]['dn_center'][dec_id], preds_dict[0]['dn_height'][dec_id],
+                        preds_dict[0]['dn_dim'][dec_id], preds_dict[0]['dn_rot'][dec_id]),
+                        dim=-1)
                 dn_pred_bboxes[dec_id].append(pred_bbox)
                 dn_pred_logits[dec_id].append(preds_dict[0]['dn_cls_logits'][dec_id])
                 dn_mask_dicts[dec_id].append(preds_dict[0]['dn_mask_dict'])

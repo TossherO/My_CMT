@@ -3,115 +3,82 @@ custom_imports = dict(
     imports=['projects.mmdet3d_plugin'], allow_failed_imports=False)
 
 
-# optimizer
-lr = 0.00014
-# This schedule is mainly used by models on nuScenes dataset
-# max_norm=10 is better for SECOND
+# The schedule is usually used by models trained on KITTI dataset
+# The learning rate set in the cyclic schedule is the initial learning rate
+# rather than the max learning rate. Since the target_ratio is (10, 1e-4),
+# the learning rate will change from 0.0018 to 0.018, than go to 0.0018*1e-4
+lr = 0.0018
+# The optimizer follows the setting in SECOND.Pytorch, but here we use
+# the official AdamW optimizer implemented by PyTorch.
 optim_wrapper = dict(
     type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
-        paramwise_cfg=dict(
-            custom_keys={
-                'img_backbone': dict(lr_mult=0.01, decay_mult=5),
-                'img_neck': dict(lr_mult=0.1)
-            }),
-    clip_grad=dict(max_norm=35, norm_type=2))
-
+    optimizer=dict(type='AdamW', lr=lr, betas=(0.95, 0.99), weight_decay=0.01),
+    clip_grad=dict(max_norm=10, norm_type=2))
 # learning rate
 param_scheduler = [
     # learning rate scheduler
-    # During the first 8 epochs, learning rate increases from 0 to lr * 10
-    # during the next 12 epochs, learning rate decreases from lr * 10 to
+    # During the first 16 epochs, learning rate increases from 0 to lr * 10
+    # during the next 24 epochs, learning rate decreases from lr * 10 to
     # lr * 1e-4
     dict(
         type='CosineAnnealingLR',
-        T_max=8,
+        T_max=16,
         eta_min=lr * 10,
         begin=0,
-        end=8,
+        end=16,
         by_epoch=True,
         convert_to_iter_based=True),
     dict(
         type='CosineAnnealingLR',
-        T_max=12,
+        T_max=24,
         eta_min=lr * 1e-4,
-        begin=8,
-        end=20,
+        begin=16,
+        end=40,
         by_epoch=True,
         convert_to_iter_based=True),
     # momentum scheduler
-    # During the first 8 epochs, momentum increases from 0 to 0.85 / 0.95
-    # during the next 12 epochs, momentum increases from 0.85 / 0.95 to 1
+    # During the first 16 epochs, momentum increases from 0 to 0.85 / 0.95
+    # during the next 24 epochs, momentum increases from 0.85 / 0.95 to 1
     dict(
         type='CosineAnnealingMomentum',
-        T_max=8,
+        T_max=16,
         eta_min=0.85 / 0.95,
         begin=0,
-        end=8,
+        end=16,
         by_epoch=True,
         convert_to_iter_based=True),
     dict(
         type='CosineAnnealingMomentum',
-        T_max=12,
+        T_max=24,
         eta_min=1,
-        begin=8,
-        end=20,
+        begin=16,
+        end=40,
         by_epoch=True,
         convert_to_iter_based=True)
 ]
 
-# runtime settings
-train_cfg = dict(by_epoch=True, max_epochs=20, val_interval=5)
+# Runtime settings，training schedule for 40e
+# Although the max_epochs is 40, this schedule is usually used we
+# RepeatDataset with repeat ratio N, thus the actual max epoch
+# number could be Nx40
+train_cfg = dict(by_epoch=True, max_epochs=40, val_interval=5)
 val_cfg = dict()
 test_cfg = dict()
 
 # Default setting for scaling LR automatically
 #   - `enable` means enable scaling LR automatically
 #       or not by default.
-#   - `base_batch_size` = (8 GPUs) x (2 samples per GPU).
-auto_scale_lr = dict(enable=False, base_batch_size=16)
+#   - `base_batch_size` = (8 GPUs) x (6 samples per GPU).
+auto_scale_lr = dict(enable=False, base_batch_size=48)
 
 
-# If point cloud range is changed, the models should also change their point
-# cloud range accordingly
-point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
-# Using calibration info convert the Lidar-coordinate point cloud range to the
-# ego-coordinate point cloud range could bring a little promotion in nuScenes.
-# point_cloud_range = [-50, -50.8, -5, 50, 49.2, 3]
-# For nuScenes we usually do 10-class detection
-class_names = [
-    'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
-    'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
-]
-metainfo = dict(classes=class_names)
-dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/'
-# Input modality for nuScenes dataset, this is consistent with the submission
-# format which requires the information in input_modality.
+# dataset settings
+dataset_type = 'KittiDataset'
+data_root = 'data/kitti/'
+class_names = ['Pedestrian', 'Cyclist', 'Car']
+point_cloud_range = [0, -40, -3, 70.4, 40, 1]
 input_modality = dict(use_lidar=True, use_camera=True)
-data_prefix = dict(
-    pts='samples/LIDAR_TOP',
-    CAM_FRONT='samples/CAM_FRONT',
-    CAM_FRONT_LEFT='samples/CAM_FRONT_LEFT',
-    CAM_FRONT_RIGHT='samples/CAM_FRONT_RIGHT',
-    CAM_BACK='samples/CAM_BACK',
-    CAM_BACK_RIGHT='samples/CAM_BACK_RIGHT',
-    CAM_BACK_LEFT='samples/CAM_BACK_LEFT',
-    sweeps='sweeps/LIDAR_TOP')
-
-# Example to use different file client
-# Method 1: simply set the data root and let the file I/O module
-# automatically infer from prefix (not support LMDB and Memcache yet)
-
-# data_root = 's3://openmmlab/datasets/detection3d/nuscenes/'
-
-# Method 2: Use backend_args, file_client_args in versions before 1.1.0
-# backend_args = dict(
-#     backend='petrel',
-#     path_mapping=dict({
-#         './data/': 's3://openmmlab/datasets/detection3d/',
-#          'data/': 's3://openmmlab/datasets/detection3d/'
-#      }))
+metainfo = dict(classes=class_names)
 backend_args = None
 
 img_norm_cfg = dict(
@@ -119,56 +86,37 @@ img_norm_cfg = dict(
     
 ida_aug_conf = {
         "resize_lim": (0.47, 0.625),
-        "final_dim": (320, 800),
+        "final_dim": (320, 960),
         "bot_pct_lim": (0.0, 0.0),
         "rot_lim": (0.0, 0.0),
-        "H": 900,
-        "W": 1600,
+        "H": 370,
+        "W": 1224,
         "rand_flip": True,
     }
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+    info_path=data_root + 'kitti_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
-        filter_by_min_points=dict(
-            car=5,
-            truck=5,
-            bus=5,
-            trailer=5,
-            construction_vehicle=5,
-            traffic_cone=5,
-            barrier=5,
-            motorcycle=5,
-            bicycle=5,
-            pedestrian=5)),
+        filter_by_min_points=dict(Car=5, Pedestrian=10, Cyclist=10)),
     classes=class_names,
-    sample_groups=dict(
-        car=2,
-        truck=3,
-        construction_vehicle=7,
-        bus=4,
-        trailer=6,
-        barrier=2,
-        motorcycle=6,
-        bicycle=6,
-        pedestrian=2,
-        traffic_cone=2),
+    sample_groups=dict(Car=12, Pedestrian=6, Cyclist=6),
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=5,
-        use_dim=[0, 1, 2, 3],
-        backend_args=backend_args))
+        load_dim=4,
+        use_dim=4,
+        backend_args=backend_args),
+    backend_args=backend_args)
 
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=5,
-        use_dim=[0, 1, 2, 3],
+        load_dim=4,
+        use_dim=4
     ),
     # dict(
     #     type='LoadPointsFromMultiSweeps',
@@ -176,20 +124,23 @@ train_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4],
     # ),
     dict(
-        type='BEVLoadMultiViewImageFromFiles',
+        type='LoadMultiViewImageFromFilesKitti',
         to_float32=True,
         color_type='color',
         backend_args=backend_args
     ),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(type='ObjectSample', db_sampler=db_sampler),
-    dict(type='ModalMask3D', mode='train'),
+    # dict(type='ModalMask3D', mode='train'),
     dict(
-        type='BEVFusionGlobalRotScaleTrans',
+        type='GlobalRotScaleTransAll',
         scale_ratio_range=[0.9, 1.1],
         rot_range=[-0.78539816, 0.78539816],
-        translation_std=0.5),
-    dict(type='BEVFusionRandomFlip3D'),
+        translation_std=[0.5, 0.5, 0.5]),
+    dict(
+        type='CustomRandomFlip3D',
+        sync_2d=False,
+        flip_ratio_bev_horizontal=0.5),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
@@ -211,8 +162,8 @@ test_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=5,
-        use_dim=[0, 1, 2, 3],
+        load_dim=4,
+        use_dim=4,
     ),
     # dict(
     #     type='LoadPointsFromMultiSweeps',
@@ -220,7 +171,7 @@ test_pipeline = [
     #     use_dim=[0, 1, 2, 3, 4],
     # ),
     dict(
-        type='BEVLoadMultiViewImageFromFiles',
+        type='LoadMultiViewImageFromFilesKitti',
         to_float32=True,
         color_type='color',
         backend_args=backend_args
@@ -232,12 +183,12 @@ test_pipeline = [
         pts_scale_ratio=1,
         flip=False,
         transforms=[
-        dict(
-            type='BEVFusionGlobalRotScaleTrans',
-            scale_ratio_range=[0.9, 1.1],
-            rot_range=[-0.78539816, 0.78539816],
-            translation_std=0.5),
-            dict(type='BEVFusionRandomFlip3D'),
+            dict(
+                type='GlobalRotScaleTrans',
+                rot_range=[0, 0],
+                scale_ratio_range=[1.0, 1.0],
+                translation_std=[0, 0, 0]),
+            # dict(type='RandomFlip3D'),
             dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
             dict(type='NormalizeMultiviewImage', **img_norm_cfg),
             dict(type='PadMultiViewImage', size_divisor=32)
@@ -246,7 +197,7 @@ test_pipeline = [
 ]
 
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=4,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -255,16 +206,16 @@ train_dataloader = dict(
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
-            ann_file='nuscenes_infos_train.pkl',
+            ann_file='kitti_infos_train.pkl',
+            data_prefix=dict(pts='training/velodyne_reduced', img='training/image_2'),
             pipeline=train_pipeline,
-            metainfo=metainfo,
             modality=input_modality,
             test_mode=False,
-            data_prefix=data_prefix,
-            use_valid_flag=True,
+            metainfo=metainfo,
             # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-            box_type_3d='LiDAR')))
+            box_type_3d='LiDAR',
+            backend_args=backend_args)))
 val_dataloader = dict(
     batch_size=1,
     num_workers=4,
@@ -274,12 +225,12 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='nuscenes_infos_val.pkl',
+        data_prefix=dict(pts='training/velodyne_reduced', img='training/image_2'),
+        ann_file='kitti_infos_val.pkl',
         pipeline=test_pipeline,
-        metainfo=metainfo,
         modality=input_modality,
         test_mode=True,
-        data_prefix=data_prefix,
+        metainfo=metainfo,
         box_type_3d='LiDAR',
         backend_args=backend_args))
 test_dataloader = dict(
@@ -291,19 +242,18 @@ test_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file='nuscenes_infos_test.pkl',
+        data_prefix=dict(pts='training/velodyne_reduced', img='training/image_2'),
+        ann_file='kitti_infos_val.pkl',
         pipeline=test_pipeline,
-        metainfo=metainfo,
         modality=input_modality,
-        data_prefix=data_prefix,
         test_mode=True,
+        metainfo=metainfo,
         box_type_3d='LiDAR',
         backend_args=backend_args))
 
 val_evaluator = dict(
-    type='NuScenesMetric',
-    data_root=data_root,
-    ann_file=data_root + 'nuscenes_infos_val.pkl',
+    type='KittiMetric',
+    ann_file=data_root + 'kitti_infos_val.pkl',
     metric='bbox',
     backend_args=backend_args)
 test_evaluator = val_evaluator
@@ -313,7 +263,7 @@ visualizer = dict(
     type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')
 
 
-voxel_size = [0.1, 0.1, 0.2]
+voxel_size = [0.1, 0.1, 0.1]
 out_size_factor = 8
 evaluation = dict(interval=20)
 
@@ -352,7 +302,7 @@ model = dict(
     pts_middle_encoder=dict(
         type='SparseEncoder',
         in_channels=4,
-        sparse_shape=[41, 1024, 1024],
+        sparse_shape=[41, 800, 800],
         output_channels=128,
         order=('conv', 'norm', 'act'),
         encoder_channels=((16, 16, 32), (32, 32, 64), (64, 64, 128), (128, 128)),
@@ -379,22 +329,17 @@ model = dict(
         in_channels=512,
         hidden_dim=256,
         downsample_scale=8,
-        common_heads=dict(center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2), vel=(2, 2)),
+        common_heads=dict(center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2)),
          tasks=[
-            dict(num_class=10, class_names=[
-                'car', 'truck', 'construction_vehicle',
-                'bus', 'trailer', 'barrier',
-                'motorcycle', 'bicycle',
-                'pedestrian', 'traffic_cone'
-            ]),
+            dict(num_class=10, class_names=['Pedestrian', 'Cyclist', 'Car']),
         ],
         bbox_coder=dict(
             type='MultiTaskBBoxCoder',
-            post_center_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
+            post_center_range=[-10.0, -50.0, -4.0, 80.0, 50.0, 2.0],
             pc_range=point_cloud_range,
             max_num=300,
             voxel_size=voxel_size,
-            num_classes=10), 
+            num_classes=3), 
         separate_head=dict(
             type='SeparateTaskHead', init_bias=-2.19, final_kernel=1),
         transformer=dict(
@@ -437,7 +382,7 @@ model = dict(
     ),
     train_cfg=dict(
         pts=dict(
-            dataset='nuScenes',
+            dataset='kitti',
             assigner=dict(
                 type='HungarianAssigner3D',
                 # cls_cost=dict(type='ClassificationCost', weight=2.0),
@@ -445,20 +390,20 @@ model = dict(
                 reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
                 iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
                 pc_range=point_cloud_range,
-                code_weights=[2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
+                code_weights=[2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             ),
             pos_weight=-1,
             gaussian_overlap=0.1,
             min_radius=2,
-            grid_size=[1024, 1024, 40],  # [x_len, y_len, 1]
+            grid_size=[800, 800, 40],  # [x_len, y_len, 1]
             voxel_size=voxel_size,
             out_size_factor=out_size_factor,
-            code_weights=[2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
+            code_weights=[2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             point_cloud_range=point_cloud_range)),
     test_cfg=dict(
         pts=dict(
-            dataset='nuScenes',
-            grid_size=[1024, 1024, 40],
+            dataset='kitti',
+            grid_size=[800, 800, 40],
             out_size_factor=out_size_factor,
             pc_range=point_cloud_range,
             voxel_size=voxel_size,
@@ -473,4 +418,5 @@ default_hooks = dict(
     checkpoint=dict(type='CheckpointHook', interval=1))
 
 load_from='models/nuim_r50.pth'
-# load_from='models/epoch_1.pth'
+
+# resume = True

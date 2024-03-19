@@ -116,12 +116,17 @@ class MultiTaskBBoxCoder(BaseBBoxCoder):
         pred_bbox_list, pred_logits_list, task_ids_list = [], [], []
         for task_id in range(task_num):
             task_pred_dict = preds_dicts[task_id][0]
-            task_pred_bbox = torch.cat(
+            if task_pred_dict.get('vel') is not None:
+                task_pred_bbox = torch.cat(
+                        (task_pred_dict['center'][-1], task_pred_dict['height'][-1],
+                        task_pred_dict['dim'][-1], task_pred_dict['rot'][-1],
+                        task_pred_dict['vel'][-1]),
+                        dim=-1)
+            else:
+                task_pred_bbox = torch.cat(
                     (task_pred_dict['center'][-1], task_pred_dict['height'][-1],
-                     task_pred_dict['dim'][-1], task_pred_dict['rot'][-1],
-                     task_pred_dict['vel'][-1]),
-                    dim=-1
-                )
+                    task_pred_dict['dim'][-1], task_pred_dict['rot'][-1]),
+                    dim=-1)
             task_pred_logits = task_pred_dict['cls_logits'][-1]
             pred_bbox_list.append(task_pred_bbox)
             pred_logits_list.append(task_pred_logits)

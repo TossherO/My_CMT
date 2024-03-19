@@ -6,25 +6,22 @@
 # ------------------------------------------------------------------------
 
 import numpy as np
-from numpy import random
 import torch
 import mmcv
-import cv2
-from mmdet3d.structures.ops import box_np_ops
 from mmdet3d.registry import TRANSFORMS
-from mmdet3d.registry import DATA_SAMPLERS
 from mmcv.transforms import BaseTransform
 from PIL import Image
 from mmdet3d.datasets.transforms import LoadMultiViewImageFromFiles
+from mmcv.transforms import LoadImageFromFile
 from typing import Optional, Union
 import copy
 from mmengine.fileio import get
-from mmdet3d.datasets import GlobalRotScaleTrans
 from typing import Any, Dict
+import mmengine.fileio as fileio
 
 
 @TRANSFORMS.register_module()
-class PadMultiViewImage(object):
+class PadMultiViewImage(BaseTransform):
     """Pad the multi-view image.
     There are two padding modes: (1) pad to a fixed size and (2) pad to the
     minimum size that is divisible by some number.
@@ -57,7 +54,7 @@ class PadMultiViewImage(object):
         results['pad_fixed_size'] = self.size
         results['pad_size_divisor'] = self.size_divisor
 
-    def __call__(self, results):
+    def transform(self, results):
         """Call function to pad images, masks, semantic segmentation maps.
         Args:
             results (dict): Result dict from loading pipeline.
@@ -76,7 +73,7 @@ class PadMultiViewImage(object):
 
 
 @TRANSFORMS.register_module()
-class NormalizeMultiviewImage(object):
+class NormalizeMultiviewImage(BaseTransform):
     """Normalize the image.
     Added key is "img_norm_cfg".
     Args:
@@ -91,7 +88,7 @@ class NormalizeMultiviewImage(object):
         self.std = np.array(std, dtype=np.float32)
         self.to_rgb = to_rgb
 
-    def __call__(self, results):
+    def transform(self, results):
         """Call function to normalize images.
         Args:
             results (dict): Result dict from loading pipeline.
@@ -108,213 +105,6 @@ class NormalizeMultiviewImage(object):
     def __repr__(self):
         repr_str = self.__class__.__name__
         repr_str += f'(mean={self.mean}, std={self.std}, to_rgb={self.to_rgb})'
-        return repr_str
-
-
-@TRANSFORMS.register_module()
-class UnifiedObjectSample(object):
-    """Sample GT objects to the data.
-
-    Args:
-        db_sampler (dict): Config dict of the database sampler.
-        sample_2d (bool): Whether to also paste 2D image patch to the images
-            This should be true when applying multi-modality cut-and-paste.
-            Defaults to False.
-    """
-
-    def __init__(self, db_sampler, sample_2d=False, sample_method='depth', modify_points=False, mixup_rate=-1):
-        self.sampler_cfg = db_sampler
-        self.sample_2d = sample_2d
-        self.sample_method = sample_method
-        self.modify_points = modify_points
-        self.mixup_rate = mixup_rate
-        if 'type' not in db_sampler.keys():
-            db_sampler['type'] = 'DataBaseSampler'
-        self.db_sampler = DATA_SAMPLERS.build(db_sampler)
-
-    @staticmethod
-    def remove_points_in_boxes(points, boxes):
-        """Remove the points in the sampled bounding boxes.
-
-        Args:
-            points (:obj:`BasePoints`): Input point cloud array.
-            boxes (np.ndarray): Sampled ground truth boxes.
-
-        Returns:
-            np.ndarray: Points with those in the boxes removed.
-        """
-        masks = box_np_ops.points_in_rbbox(points.coord.numpy(), boxes)
-        points = points[np.logical_not(masks.any(-1))]
-        return points
-
-    def __call__(self, input_dict):
-        """Call function to sample ground truth objects to the data.
-
-        Args:
-            input_dict (dict): Result dict from loading pipeline.
-
-        Returns:
-            dict: Results after object sampling augmentation, \
-                'points', 'gt_bboxes_3d', 'gt_labels_3d' keys are updated \
-                in the result dict.
-        """
-        gt_bboxes_3d = input_dict['gt_bboxes_3d']
-        gt_labels_3d = input_dict['gt_labels_3d']
-
-        # change to float for blending operation
-        points = input_dict['points']
-        if self.sample_2d:
-            # Assume for now 3D & 2D bboxes are the same
-            sampled_dict = self.db_sampler.sample_all(
-                gt_bboxes_3d.tensor.numpy(),
-                gt_labels_3d,
-                with_img=True)
-        else:
-            sampled_dict = self.db_sampler.sample_all(
-                gt_bboxes_3d.tensor.numpy(), gt_labels_3d, with_img=False)
-
-        if sampled_dict is not None:
-            sampled_gt_bboxes_3d = sampled_dict['gt_bboxes_3d']
-            sampled_points = sampled_dict['points']
-            sampled_points_idx = sampled_dict["points_idx"]
-            sampled_gt_labels = sampled_dict['gt_labels_3d']
-
-            gt_labels_3d = np.concatenate([gt_labels_3d, sampled_gt_labels],
-                                          axis=0)
-            gt_bboxes_3d = gt_bboxes_3d.new_box(
-                np.concatenate(
-                    [gt_bboxes_3d.tensor.numpy(), sampled_gt_bboxes_3d]))
-
-            points = self.remove_points_in_boxes(points, sampled_gt_bboxes_3d)
-            points_idx = -1 * np.ones(len(points), dtype=np.int)
-            # check the points dimension
-            # points = points.cat([sampled_points, points])
-            points = points.cat([points, sampled_points])
-            points_idx = np.concatenate([points_idx, sampled_points_idx], axis=0)
-
-            if self.sample_2d:
-                imgs = input_dict['img']
-                lidar2img = input_dict['lidar2img']
-                sampled_img = sampled_dict['images']
-                sampled_num = len(sampled_gt_bboxes_3d)
-                imgs, points_keep = self.unified_sample(imgs, lidar2img, 
-                                            points.tensor.numpy(), 
-                                            points_idx, gt_bboxes_3d.corners.numpy(), 
-                                            sampled_img, sampled_num)
-                
-                input_dict['img'] = imgs
-
-                if self.modify_points:
-                    points = points[points_keep]
-
-        input_dict['gt_bboxes_3d'] = gt_bboxes_3d
-        input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.long)
-        input_dict['points'] = points
-
-        return input_dict
-
-    def unified_sample(self, imgs, lidar2img, points, points_idx, bboxes_3d, sampled_img, sampled_num):
-        # for boxes
-        bboxes_3d = np.concatenate([bboxes_3d, np.ones_like(bboxes_3d[..., :1])], -1)
-        is_raw = np.ones(len(bboxes_3d))
-        is_raw[-sampled_num:] = 0
-        is_raw = is_raw.astype(bool)
-        raw_num = len(is_raw)-sampled_num
-        # for point cloud
-        points_3d = points[:,:4].copy()
-        points_3d[:,-1] = 1
-        points_keep = np.ones(len(points_3d)).astype(np.bool)
-        new_imgs = imgs
-
-        assert len(imgs)==len(lidar2img) and len(sampled_img)==sampled_num
-        for _idx, (_img, _lidar2img) in enumerate(zip(imgs, lidar2img)):
-            coord_img = bboxes_3d @ _lidar2img.T
-            coord_img[...,:2] /= coord_img[...,2,None]
-            depth = coord_img[...,2]
-            img_mask = (depth > 0).all(axis=-1)
-            img_count = img_mask.nonzero()[0]
-            if img_mask.sum() == 0:
-                continue
-            depth = depth.mean(1)[img_mask]
-            coord_img = coord_img[...,:2][img_mask]
-            minxy = np.min(coord_img, axis=-2)
-            maxxy = np.max(coord_img, axis=-2)
-            bbox = np.concatenate([minxy, maxxy], axis=-1).astype(int)
-            bbox[:,0::2] = np.clip(bbox[:,0::2], a_min=0, a_max=_img.shape[1]-1)
-            bbox[:,1::2] = np.clip(bbox[:,1::2], a_min=0, a_max=_img.shape[0]-1)
-            img_mask = ((bbox[:,2:]-bbox[:,:2]) > 1).all(axis=-1)
-            if img_mask.sum() == 0:
-                continue
-            depth = depth[img_mask]
-            if 'depth' in self.sample_method:
-                paste_order = depth.argsort()
-                paste_order = paste_order[::-1]
-            else:
-                paste_order = np.arange(len(depth), dtype=np.int64)
-            img_count = img_count[img_mask][paste_order]
-            bbox = bbox[img_mask][paste_order]
-
-            paste_mask = -255 * np.ones(_img.shape[:2], dtype=np.int)
-            fg_mask = np.zeros(_img.shape[:2], dtype=np.int)
-            # first crop image from raw image
-            raw_img = []
-            for _count, _box in zip(img_count, bbox):
-                if is_raw[_count]:
-                    raw_img.append(_img[_box[1]:_box[3],_box[0]:_box[2]])
-
-            # then stitch the crops to raw image
-            for _count, _box in zip(img_count, bbox):
-                if is_raw[_count]:
-                    if self.mixup_rate < 0:
-                        _img[_box[1]:_box[3],_box[0]:_box[2]] = raw_img.pop(0)
-                    else:
-                        _img[_box[1]:_box[3],_box[0]:_box[2]] = \
-                            _img[_box[1]:_box[3],_box[0]:_box[2]] * (1 - self.mixup_rate) + raw_img.pop(0) * self.mixup_rate
-                    fg_mask[_box[1]:_box[3],_box[0]:_box[2]] = 1
-                else:
-                    img_crop = sampled_img[_count-raw_num]
-                    if len(img_crop)==0: continue
-                    img_crop = cv2.resize(img_crop, tuple(_box[[2,3]]-_box[[0,1]]))
-                    if self.mixup_rate < 0:
-                        _img[_box[1]:_box[3],_box[0]:_box[2]] = img_crop
-                    else:
-                        _img[_box[1]:_box[3],_box[0]:_box[2]] = \
-                            _img[_box[1]:_box[3],_box[0]:_box[2]] * (1 - self.mixup_rate) + img_crop * self.mixup_rate
-
-                paste_mask[_box[1]:_box[3],_box[0]:_box[2]] = _count
-            
-            new_imgs[_idx] = _img
-
-            # calculate modify mask
-            if self.modify_points:
-                points_img = points_3d @ _lidar2img.T
-                points_img[:,:2] /= points_img[:,2,None]
-                depth = points_img[:,2]
-                img_mask = depth > 0
-                if img_mask.sum() == 0:
-                    continue
-                img_mask = (points_img[:,0] > 0) & (points_img[:,0] < _img.shape[1]) & \
-                           (points_img[:,1] > 0) & (points_img[:,1] < _img.shape[0]) & img_mask
-                points_img = points_img[img_mask].astype(int)
-                new_mask = paste_mask[points_img[:,1], points_img[:,0]]==(points_idx[img_mask]+raw_num)
-                raw_fg = (fg_mask == 1) & (paste_mask >= 0) & (paste_mask < raw_num)
-                raw_bg = (fg_mask == 0) & (paste_mask < 0)
-                raw_mask = raw_fg[points_img[:,1], points_img[:,0]] | raw_bg[points_img[:,1], points_img[:,0]]
-                keep_mask = new_mask | raw_mask
-                points_keep[img_mask] = points_keep[img_mask] & keep_mask
-
-        return new_imgs, points_keep
-
-    def __repr__(self):
-        """str: Return a string that describes the module."""
-        repr_str = self.__class__.__name__
-        repr_str += f' sample_2d={self.sample_2d},'
-        repr_str += f' data_root={self.sampler_cfg.data_root},'
-        repr_str += f' info_path={self.sampler_cfg.info_path},'
-        repr_str += f' rate={self.sampler_cfg.rate},'
-        repr_str += f' prepare={self.sampler_cfg.prepare},'
-        repr_str += f' classes={self.sampler_cfg.classes},'
-        repr_str += f' sample_groups={self.sampler_cfg.sample_groups}'
         return repr_str
 
 
@@ -432,18 +222,36 @@ class ResizeCropFlipImage(BaseTransform):
 
 
 @TRANSFORMS.register_module()
-class GlobalRotScaleTransAll(object):
+class GlobalRotScaleTransAll(BaseTransform):
     """Apply global rotation, scaling and translation to a 3D scene.
+
+    Required Keys:
+
+    - points (np.float32)
+    - gt_bboxes_3d (np.float32)
+
+    Modified Keys:
+
+    - points (np.float32)
+    - gt_bboxes_3d (np.float32)
+
+    Added Keys:
+
+    - points (np.float32)
+    - pcd_trans (np.float32)
+    - pcd_rotation (np.float32)
+    - pcd_rotation_angle (np.float32)
+    - pcd_scale_factor (np.float32)
 
     Args:
         rot_range (list[float]): Range of rotation angle.
             Defaults to [-0.78539816, 0.78539816] (close to [-pi/4, pi/4]).
         scale_ratio_range (list[float]): Range of scale ratio.
             Defaults to [0.95, 1.05].
-        translation_std (list[float]): The standard deviation of translation
-            noise. This applies random translation to a scene by a noise, which
+        translation_std (list[float]): The standard deviation of
+            translation noise applied to a scene, which
             is sampled from a gaussian distribution whose standard deviation
-            is set by ``translation_std``. Defaults to [0, 0, 0]
+            is set by ``translation_std``. Defaults to [0, 0, 0].
         shift_height (bool): Whether to shift height.
             (the fourth dimension of indoor points) when scaling.
             Defaults to False.
@@ -483,19 +291,16 @@ class GlobalRotScaleTransAll(object):
             input_dict (dict): Result dict from loading pipeline.
 
         Returns:
-            dict: Results after translation, 'points', 'pcd_trans' \
-                and keys in input_dict['bbox3d_fields'] are updated \
-                in the result dict.
+            dict: Results after translation, 'points', 'pcd_trans'
+            and `gt_bboxes_3d` is updated in the result dict.
         """
         translation_std = np.array(self.translation_std, dtype=np.float32)
         trans_factor = np.random.normal(scale=translation_std, size=3).T
         
         input_dict['points'].translate(trans_factor)
-        if 'radar' in input_dict:
-            input_dict['radar'].translate(trans_factor)
         input_dict['pcd_trans'] = trans_factor
-        for key in input_dict['bbox3d_fields']:
-            input_dict[key].translate(trans_factor)
+        if 'gt_bboxes_3d' in input_dict:
+            input_dict['gt_bboxes_3d'].translate(trans_factor)
 
         trans_mat = np.eye(4)
         trans_mat[:3, -1] = trans_factor
@@ -511,54 +316,32 @@ class GlobalRotScaleTransAll(object):
             input_dict (dict): Result dict from loading pipeline.
 
         Returns:
-            dict: Results after rotation, 'points', 'pcd_rotation' \
-                and keys in input_dict['bbox3d_fields'] are updated \
-                in the result dict.
+            dict: Results after rotation, 'points', 'pcd_rotation'
+            and `gt_bboxes_3d` is updated in the result dict.
         """
-        if 'rot_degree' not in input_dict:
-            rotation = self.rot_range
-            noise_rotation = np.random.uniform(rotation[0], rotation[1])
+        rotation = self.rot_range
+        noise_rotation = np.random.uniform(rotation[0], rotation[1])
+
+        if 'gt_bboxes_3d' in input_dict and \
+                len(input_dict['gt_bboxes_3d'].tensor) != 0:
+            # rotate points with bboxes
+            points, rot_mat_T = input_dict['gt_bboxes_3d'].rotate(
+                noise_rotation, input_dict['points'])
+            input_dict['points'] = points
         else:
-            noise_rotation = input_dict['rot_degree']
+            # if no bbox in input_dict, only rotate points
+            rot_mat_T = input_dict['points'].rotate(noise_rotation)
 
-        # if no bbox in input_dict, only rotate points
-        if len(input_dict['bbox3d_fields']) == 0:
-            if 'rot_degree' not in input_dict:
-                rot_mat_T = input_dict['points'].rotate(noise_rotation)
-                if 'radar' in input_dict:
-                    input_dict['radar'].rotate(noise_rotation)
-            else:
-                rot_mat_T = input_dict['points'].rotate(-noise_rotation)
-                if 'radar' in input_dict:
-                    input_dict['radar'].rotate(-noise_rotation)
-            input_dict['pcd_rotation'] = rot_mat_T
+        input_dict['pcd_rotation'] = rot_mat_T
+        input_dict['pcd_rotation_angle'] = noise_rotation
 
-            rot_mat = torch.eye(4)
-            rot_mat[:3, :3].copy_(rot_mat_T)
-            rot_mat[0, 1], rot_mat[1, 0] = -rot_mat[0, 1], -rot_mat[1, 0]
-            rot_mat_inv = torch.inverse(rot_mat)
-            for view in range(len(input_dict["lidar2img"])):
-                input_dict["lidar2img"][view] = (torch.tensor(input_dict["lidar2img"][view]).float() @ rot_mat_inv).numpy()
-                input_dict["lidar2cam"][view] = (torch.tensor(input_dict["lidar2cam"][view]).float() @ rot_mat_inv).numpy()
-            return
-
-        # rotate points with bboxes
-        for key in input_dict['bbox3d_fields']:
-            if len(input_dict[key].tensor) != 0:
-                points, rot_mat_T = input_dict[key].rotate(
-                    noise_rotation, input_dict['points'])
-                input_dict['points'] = points
-                input_dict['pcd_rotation'] = rot_mat_T
-                if 'radar' in input_dict:
-                    input_dict['radar'].rotate(-noise_rotation)
-
-                rot_mat = torch.eye(4)
-                rot_mat[:3, :3].copy_(rot_mat_T)
-                rot_mat[0, 1], rot_mat[1, 0] = -rot_mat[0, 1], -rot_mat[1, 0]
-                rot_mat_inv = torch.inverse(rot_mat)
-                for view in range(len(input_dict["lidar2img"])):
-                    input_dict["lidar2img"][view] = (torch.tensor(input_dict["lidar2img"][view]).float() @ rot_mat_inv).numpy()
-                    input_dict["lidar2cam"][view] = (torch.tensor(input_dict["lidar2cam"][view]).float() @ rot_mat_inv).numpy()
+        rot_mat = torch.eye(4)
+        rot_mat[:3, :3].copy_(rot_mat_T)
+        rot_mat[0, 1], rot_mat[1, 0] = -rot_mat[0, 1], -rot_mat[1, 0]
+        rot_mat_inv = torch.inverse(rot_mat)
+        for view in range(len(input_dict["lidar2img"])):
+            input_dict["lidar2img"][view] = (torch.tensor(input_dict["lidar2img"][view]).float() @ rot_mat_inv).numpy()
+            input_dict["lidar2cam"][view] = (torch.tensor(input_dict["lidar2cam"][view]).float() @ rot_mat_inv).numpy()
 
 
     def _scale_bbox_points(self, input_dict):
@@ -568,8 +351,8 @@ class GlobalRotScaleTransAll(object):
             input_dict (dict): Result dict from loading pipeline.
 
         Returns:
-            dict: Results after scaling, 'points'and keys in \
-                input_dict['bbox3d_fields'] are updated in the result dict.
+            dict: Results after scaling, 'points' and
+            `gt_bboxes_3d` is updated in the result dict.
         """
         scale = input_dict['pcd_scale_factor']
         points = input_dict['points']
@@ -579,12 +362,10 @@ class GlobalRotScaleTransAll(object):
                 'setting shift_height=True but points have no height attribute'
             points.tensor[:, points.attribute_dims['height']] *= scale
         input_dict['points'] = points
-        
-        if 'radar' in input_dict:
-            input_dict['radar'].scale(scale)
             
-        for key in input_dict['bbox3d_fields']:
-            input_dict[key].scale(scale)
+        if 'gt_bboxes_3d' in input_dict and \
+                len(input_dict['gt_bboxes_3d'].tensor) != 0:
+            input_dict['gt_bboxes_3d'].scale(scale)
 
         scale_mat = torch.tensor(
             [
@@ -606,15 +387,15 @@ class GlobalRotScaleTransAll(object):
             input_dict (dict): Result dict from loading pipeline.
 
         Returns:
-            dict: Results after scaling, 'pcd_scale_factor' are updated \
-                in the result dict.
+            dict: Results after scaling, 'pcd_scale_factor'
+            are updated in the result dict.
         """
         scale_factor = np.random.uniform(self.scale_ratio_range[0],
                                          self.scale_ratio_range[1])
         input_dict['pcd_scale_factor'] = scale_factor
 
-    def __call__(self, input_dict):
-        """Private function to rotate, scale and translate bounding boxes and \
+    def transform(self, input_dict):
+        """Private function to rotate, scale and translate bounding boxes and
         points.
 
         Args:
@@ -622,8 +403,8 @@ class GlobalRotScaleTransAll(object):
 
         Returns:
             dict: Results after scaling, 'points', 'pcd_rotation',
-                'pcd_scale_factor', 'pcd_trans' and keys in \
-                input_dict['bbox3d_fields'] are updated in the result dict.
+            'pcd_scale_factor', 'pcd_trans' and `gt_bboxes_3d` are updated
+            in the result dict.
         """
         if 'transformation_3d_flow' not in input_dict:
             input_dict['transformation_3d_flow'] = []
@@ -650,7 +431,7 @@ class GlobalRotScaleTransAll(object):
 
 
 @TRANSFORMS.register_module()
-class CustomRandomFlip3D(object):
+class CustomRandomFlip3D(BaseTransform):
     """Flip the points & bbox.
 
     If the input dict contains the key "flip", then the flag will be used,
@@ -687,31 +468,33 @@ class CustomRandomFlip3D(object):
     def random_flip_data_3d(self, input_dict, direction='horizontal'):
         """Flip 3D data randomly.
 
+        `random_flip_data_3d` should take these situations into consideration:
+
+        - 1. LIDAR-based 3d detection
+        - 2. LIDAR-based 3d segmentation
+        - 3. vision-only detection
+        - 4. multi-modality 3d detection.
+
         Args:
             input_dict (dict): Result dict from loading pipeline.
-            direction (str): Flip direction. Default: horizontal.
+            direction (str): Flip direction. Defaults to 'horizontal'.
 
         Returns:
-            dict: Flipped results, 'points', 'bbox3d_fields' keys are \
-                updated in the result dict.
+            dict: Flipped results, 'points', 'bbox3d_fields' keys are
+            updated in the result dict.
         """
         assert direction in ['horizontal', 'vertical']
-        if len(input_dict['bbox3d_fields']) == 0:  # test mode
-            input_dict['bbox3d_fields'].append('empty_box3d')
-            input_dict['empty_box3d'] = input_dict['box_type_3d'](
-                np.array([], dtype=np.float32))
-        assert len(input_dict['bbox3d_fields']) == 1
-        for key in input_dict['bbox3d_fields']:
+        if 'gt_bboxes_3d' in input_dict:
             if 'points' in input_dict:
-                input_dict['points'] = input_dict[key].flip(
+                input_dict['points'] = input_dict['gt_bboxes_3d'].flip(
                     direction, points=input_dict['points'])
             else:
-                input_dict[key].flip(direction)
-            if 'radar' in input_dict:
-                input_dict['radar'].flip(direction)
+                # vision-only detection
+                input_dict['gt_bboxes_3d'].flip(direction)
+        else:
+            input_dict['points'].flip(direction)
 
-    def __call__(self, input_dict):
-        print(input_dict.keys())
+    def transform(self, input_dict):
         """Call function to flip points, values in the ``bbox3d_fields`` and \
         also flip 2D image and its annotations.
 
@@ -758,14 +541,14 @@ class CustomRandomFlip3D(object):
 
 
 @TRANSFORMS.register_module()
-class ModalMask3D(object):
+class ModalMask3D(BaseTransform):
 
     def __init__(self, mode='test', mask_modal='image', **kwargs):
         super(ModalMask3D, self).__init__()
         self.mode = mode
         self.mask_modal = mask_modal
 
-    def __call__(self, input_dict):
+    def transform(self, input_dict):
         if self.mode == 'test':
             if self.mask_modal == 'image':
                 input_dict['img'] = [0. * item for item in input_dict['img']]
@@ -787,7 +570,7 @@ class ModalMask3D(object):
 
 
 @TRANSFORMS.register_module()
-class GlobalRotScaleTransImage(object):
+class GlobalRotScaleTransImage(BaseTransform):
     """Random resize, Crop and flip the image
     Args:
         size (tuple, optional): Fixed padding size.
@@ -814,7 +597,7 @@ class GlobalRotScaleTransImage(object):
         self.flip_dx_ratio = flip_dx_ratio
         self.flip_dy_ratio = flip_dy_ratio
 
-    def __call__(self, results):
+    def transform(self, results):
         """Call function to pad images, masks, semantic segmentation maps.
         Args:
             results (dict): Result dict from loading pipeline.
@@ -898,7 +681,7 @@ class GlobalRotScaleTransImage(object):
     
 
 @TRANSFORMS.register_module()
-class BEVLoadMultiViewImageFromFiles(LoadMultiViewImageFromFiles):
+class LoadMultiViewImageFromFilesNus(LoadMultiViewImageFromFiles):
     """Load multi channel images from a list of separate channel files.
 
     ``BEVLoadMultiViewImageFromFiles`` adds the following keys for the
@@ -1003,78 +786,49 @@ class BEVLoadMultiViewImageFromFiles(LoadMultiViewImageFromFiles):
     
 
 @TRANSFORMS.register_module()
-class BEVFusionGlobalRotScaleTrans(GlobalRotScaleTrans):
-    """Compared with `GlobalRotScaleTrans`, the augmentation order in this
-    class is rotation, translation and scaling (RTS)."""
-
-    def transform(self, input_dict: dict) -> dict:
-        """Private function to rotate, scale and translate bounding boxes and
-        points.
+class LoadMultiViewImageFromFilesKitti(LoadImageFromFile):
+    
+    def transform(self, results: dict) -> Optional[dict]:
+        """Functions to load image.
 
         Args:
-            input_dict (dict): Result dict from loading pipeline.
+            results (dict): Result dict from
+                :class:`mmengine.dataset.BaseDataset`.
 
         Returns:
-            dict: Results after scaling, 'points', 'pcd_rotation',
-            'pcd_scale_factor', 'pcd_trans' and `gt_bboxes_3d` are updated
-            in the result dict.
+            dict: The dict contains loaded image and meta information.
         """
-        if 'transformation_3d_flow' not in input_dict:
-            input_dict['transformation_3d_flow'] = []
 
-        self._rot_bbox_points(input_dict)
+        filename = results['img_path']
 
-        if 'pcd_scale_factor' not in input_dict:
-            self._random_scale(input_dict)
-        self._trans_bbox_points(input_dict)
-        self._scale_bbox_points(input_dict)
+        try:
+            if self.file_client_args is not None:
+                file_client = fileio.FileClient.infer_client(
+                    self.file_client_args, filename)
+                img_bytes = file_client.get(filename)
+            else:
+                img_bytes = fileio.get(
+                    filename, backend_args=self.backend_args)
+            img = mmcv.imfrombytes(
+                img_bytes, flag=self.color_type, backend=self.imdecode_backend)
+        except Exception as e:
+            if self.ignore_empty:
+                return None
+            else:
+                raise e
+        # in some cases, images are not read successfully, the img would be
+        # `None`, refer to https://github.com/open-mmlab/mmpretrain/issues/1427
+        assert img is not None, f'failed to load image: {filename}'
+        if self.to_float32:
+            img = img.astype(np.float32)
 
-        input_dict['transformation_3d_flow'].extend(['R', 'T', 'S'])
-
-        lidar_augs = np.eye(4)
-        lidar_augs[:3, :3] = input_dict['pcd_rotation'].T * input_dict[
-            'pcd_scale_factor']
-        lidar_augs[:3, 3] = input_dict['pcd_trans'] * \
-            input_dict['pcd_scale_factor']
-
-        if 'lidar_aug_matrix' not in input_dict:
-            input_dict['lidar_aug_matrix'] = np.eye(4)
-        input_dict[
-            'lidar_aug_matrix'] = lidar_augs @ input_dict['lidar_aug_matrix']
-
-        return input_dict
-    
-
-@TRANSFORMS.register_module()
-class BEVFusionRandomFlip3D:
-    """Compared with `RandomFlip3D`, this class directly records the lidar
-    augmentation matrix in the `data`."""
-
-    def __call__(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        flip_horizontal = np.random.choice([0, 1])
-        flip_vertical = np.random.choice([0, 1])
-
-        rotation = np.eye(3)
-        if flip_horizontal:
-            rotation = np.array([[1, 0, 0], [0, -1, 0], [0, 0, 1]]) @ rotation
-            if 'points' in data:
-                data['points'].flip('horizontal')
-            if 'gt_bboxes_3d' in data:
-                data['gt_bboxes_3d'].flip('horizontal')
-            if 'gt_masks_bev' in data:
-                data['gt_masks_bev'] = data['gt_masks_bev'][:, :, ::-1].copy()
-
-        if flip_vertical:
-            rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]) @ rotation
-            if 'points' in data:
-                data['points'].flip('vertical')
-            if 'gt_bboxes_3d' in data:
-                data['gt_bboxes_3d'].flip('vertical')
-            if 'gt_masks_bev' in data:
-                data['gt_masks_bev'] = data['gt_masks_bev'][:, ::-1, :].copy()
-
-        if 'lidar_aug_matrix' not in data:
-            data['lidar_aug_matrix'] = np.eye(4)
-        data['lidar_aug_matrix'][:3, :] = rotation @ data[
-            'lidar_aug_matrix'][:3, :]
-        return data
+        results['filename'] = filename
+        results['cam2img'] = np.stack([results['cam2img']], axis=0)
+        results['lidar2cam'] = np.stack([results['lidar2cam']], axis=0)
+        results['lidar2img'] = np.stack([results['lidar2img']], axis=0)
+        results['img'] = [img]
+        results['img_shape'] = img.shape[:2]
+        results['ori_shape'] = img.shape[:2]
+        results['pad_shape'] = img.shape[:2]
+        results['num_views'] = 1
+        return results
