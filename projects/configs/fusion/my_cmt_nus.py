@@ -10,11 +10,11 @@ lr = 0.00014
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
-        paramwise_cfg=dict(
-            custom_keys={
-                'img_backbone': dict(lr_mult=0.01, decay_mult=5),
-                'img_neck': dict(lr_mult=0.1)
-            }),
+    paramwise_cfg=dict(
+        custom_keys={
+            'img_backbone': dict(lr_mult=0.01, decay_mult=5),
+            'img_neck': dict(lr_mult=0.1)
+        }),
     clip_grad=dict(max_norm=35, norm_type=2))
 
 # learning rate
