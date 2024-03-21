@@ -53,7 +53,7 @@ img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[57.375, 57.120, 58.395], to_rgb=False)
     
 ida_aug_conf = {
-        "resize_lim": (0.47, 0.625),
+        "resize_lim": (0.5, 0.8),
         "final_dim": (320, 960),
         "bot_pct_lim": (0.0, 0.0),
         "rot_lim": (0.0, 0.0),
@@ -63,6 +63,7 @@ ida_aug_conf = {
     }
 
 db_sampler = dict(
+    type='UnifiedDataBaseSampler',
     data_root=data_root,
     info_path=data_root + 'kitti_dbinfos_train.pkl',
     rate=1.0,
@@ -75,9 +76,7 @@ db_sampler = dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=4,
-        use_dim=4,
-        backend_args=backend_args),
-    backend_args=backend_args)
+        use_dim=4))
 
 train_pipeline = [
     dict(
@@ -98,7 +97,12 @@ train_pipeline = [
         backend_args=backend_args
     ),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(type='ObjectSample', db_sampler=db_sampler),
+    # dict(
+    #     type='UnifiedObjectSample',
+    #     sample_2d=True,
+    #     mixup_rate=0.5,
+    #     db_sampler=db_sampler
+    # ),
     # dict(type='ModalMask3D', mode='train'),
     dict(
         type='GlobalRotScaleTransAll',
@@ -158,7 +162,7 @@ test_pipeline = [
                 translation_std=[0, 0, 0]),
             # dict(type='RandomFlip3D'),
             dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
-            dict(type='NormalizeMultiviewImage', **img_norm_cfg),
+            # dict(type='NormalizeMultiviewImage', **img_norm_cfg),
             dict(type='PadMultiViewImage', size_divisor=32)
         ]),
     dict(type='Pack3DDetInputs', keys=['points', 'img'])
@@ -240,8 +244,6 @@ model = dict(
     use_grid_mask=True,
     data_preprocessor=dict(
         type='Det3DDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
         bgr_to_rgb=False),
     img_backbone=dict(
         type='ResNet',

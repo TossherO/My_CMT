@@ -127,8 +127,9 @@ ida_aug_conf = {
         "rand_flip": True,
     }
 
-db_sampler = dict(
-    data_root=data_root,
+db_sampler=dict(
+    type='UnifiedDataBaseSampler',
+    data_root=None,
     info_path=data_root + 'nuscenes_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
@@ -160,8 +161,7 @@ db_sampler = dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=[0, 1, 2, 3],
-        backend_args=backend_args))
+        use_dim=[0, 1, 2, 3]))
 
 train_pipeline = [
     dict(
@@ -182,7 +182,12 @@ train_pipeline = [
         backend_args=backend_args
     ),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(type='ObjectSample', db_sampler=db_sampler),
+    dict(
+        type='UnifiedObjectSample',
+        sample_2d=True,
+        mixup_rate=0.5,
+        db_sampler=db_sampler
+    ),
     dict(type='ModalMask3D', mode='train'),
     dict(
         type='GlobalRotScaleTransAll',

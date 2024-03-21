@@ -8,11 +8,10 @@ import os
 from mmdet3d.structures.ops import box_np_ops
 from mmdet3d.datasets.transforms import data_augment_utils
 from mmdet3d.registry import TRANSFORMS
-from mmdet3d.registry import DATA_SAMPLERS
 from mmdet3d.datasets.transforms.dbsampler import BatchSampler
 
 
-@DATA_SAMPLERS.register_module()
+@TRANSFORMS.register_module()
 class UnifiedDataBaseSampler(object):
     """Class for sampling data from the ground truth database.
 
