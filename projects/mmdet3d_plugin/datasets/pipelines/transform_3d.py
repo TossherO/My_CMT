@@ -989,7 +989,7 @@ class UnifiedObjectSample(object):
                     [gt_bboxes_3d.tensor.numpy(), sampled_gt_bboxes_3d]))
 
             points = self.remove_points_in_boxes(points, sampled_gt_bboxes_3d)
-            points_idx = -1 * np.ones(len(points), dtype=np.int)
+            points_idx = -1 * np.ones(len(points), dtype=np.int32)
             # check the points dimension
             # points = points.cat([sampled_points, points])
             points = points.cat([points, sampled_points])
@@ -1011,7 +1011,7 @@ class UnifiedObjectSample(object):
                     points = points[points_keep]
 
         input_dict['gt_bboxes_3d'] = gt_bboxes_3d
-        input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.long)
+        input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.int64)
         input_dict['points'] = points
 
         return input_dict
@@ -1026,7 +1026,7 @@ class UnifiedObjectSample(object):
         # for point cloud
         points_3d = points[:,:4].copy()
         points_3d[:,-1] = 1
-        points_keep = np.ones(len(points_3d)).astype(np.bool)
+        points_keep = np.ones(len(points_3d)).astype(bool)
         new_imgs = imgs
 
         assert len(imgs)==len(lidar2img) and len(sampled_img)==sampled_num
@@ -1057,8 +1057,8 @@ class UnifiedObjectSample(object):
             img_count = img_count[img_mask][paste_order]
             bbox = bbox[img_mask][paste_order]
 
-            paste_mask = -255 * np.ones(_img.shape[:2], dtype=np.int)
-            fg_mask = np.zeros(_img.shape[:2], dtype=np.int)
+            paste_mask = -255 * np.ones(_img.shape[:2], dtype=np.int32)
+            fg_mask = np.zeros(_img.shape[:2], dtype=np.int32)
             # first crop image from raw image
             raw_img = []
             for _count, _box in zip(img_count, bbox):

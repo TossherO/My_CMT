@@ -185,7 +185,7 @@ class UnifiedDataBaseSampler(object):
             s_imgs_list = []
             count = 0
             for info in sampled:
-                print(info)
+                # print(info)
                 file_path = os.path.join(
                     self.data_root,
                     info['path']) if self.data_root else info['path']
@@ -194,7 +194,7 @@ class UnifiedDataBaseSampler(object):
                     results['pts_nori_path'] = info['nori_id']
                 s_points = self.points_loader(results)['points']
                 s_points.translate(info['box3d_lidar'][:3])
-                idx_points = count * np.ones(len(s_points), dtype=np.int64)
+                idx_points = count * np.ones(len(s_points), dtype=np.int32)
                 s_points_list.append(s_points)
                 s_idx_list.append(idx_points)
                 count += 1
@@ -210,7 +210,7 @@ class UnifiedDataBaseSampler(object):
                     s_imgs_list.append(s_img)
 
             gt_labels = np.array([self.cat2label[s['name']] for s in sampled],
-                                 dtype=np.long)
+                                 dtype=np.int64)
             ret = {
                 'gt_labels_3d':
                 gt_labels,
