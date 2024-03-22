@@ -324,7 +324,6 @@ visualizer = dict(
 
 voxel_size = [0.1, 0.1, 0.2]
 out_size_factor = 8
-evaluation = dict(interval=20)
 
 model = dict(
     type='CmtDetector',
