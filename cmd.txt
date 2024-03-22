@@ -4,6 +4,6 @@ python train.py projects/configs/fusion/my_cmt_nus.py --auto-scale-lr
 
 ./dist_train.sh projects/configs/fusion/my_cmt_nus.py 2 --auto-scale-lr
 
-python tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag nuscenes --version v1.0-trainval --max-sweeps 0
+python my_tools/create_data.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag nuscenes --version v1.0-trainval --max-sweeps 0 --only-gt-database
 
-python tools/create_data.py kitti --root-path ./data/kitti --out-dir ./data/kitti --extra-tag kitti --with-plane
+python my_tools/create_data.py kitti --root-path ./data/kitti --out-dir ./data/kitti --extra-tag kitti --with-plane --only-gt-database

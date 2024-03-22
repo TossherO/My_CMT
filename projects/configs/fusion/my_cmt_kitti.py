@@ -25,7 +25,7 @@ param_scheduler = [
         T_max=40,
         end=40,
         by_epoch=True,
-        eta_min=1e-4,
+        eta_min=lr*1e-2,
         convert_to_iter_based=True)
 ]
 # training schedule for 1x
@@ -97,12 +97,12 @@ train_pipeline = [
         backend_args=backend_args
     ),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    # dict(
-    #     type='UnifiedObjectSample',
-    #     sample_2d=True,
-    #     mixup_rate=0.5,
-    #     db_sampler=db_sampler
-    # ),
+    dict(
+        type='UnifiedObjectSample',
+        sample_2d=True,
+        mixup_rate=0.5,
+        db_sampler=db_sampler
+    ),
     # dict(type='ModalMask3D', mode='train'),
     dict(
         type='GlobalRotScaleTransAll',

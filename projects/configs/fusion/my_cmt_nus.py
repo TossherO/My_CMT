@@ -129,7 +129,7 @@ ida_aug_conf = {
 
 db_sampler=dict(
     type='UnifiedDataBaseSampler',
-    data_root=None,
+    data_root=data_root,
     info_path=data_root + 'nuscenes_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
@@ -331,8 +331,6 @@ model = dict(
     use_grid_mask=True,
     data_preprocessor=dict(
         type='Det3DDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
         bgr_to_rgb=False),
     img_backbone=dict(
         type='ResNet',

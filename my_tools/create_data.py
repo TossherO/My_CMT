@@ -4,14 +4,14 @@ from os import path as osp
 
 from mmengine import print_log
 
-from tools.dataset_converters import indoor_converter as indoor
-from tools.dataset_converters import kitti_converter as kitti
-from tools.dataset_converters import lyft_converter as lyft_converter
-from tools.dataset_converters import nuscenes_converter as nuscenes_converter
-from tools.dataset_converters import semantickitti_converter
-from tools.dataset_converters.create_gt_database import (
+from dataset_converters import indoor_converter as indoor
+from dataset_converters import kitti_converter as kitti
+from dataset_converters import lyft_converter as lyft_converter
+from dataset_converters import nuscenes_converter as nuscenes_converter
+from dataset_converters import semantickitti_converter
+from dataset_converters.create_gt_database import (
     GTDatabaseCreater, create_groundtruth_database)
-from tools.dataset_converters.update_infos_to_v2 import update_pkl_infos
+from dataset_converters.update_infos_to_v2 import update_pkl_infos
 
 
 def kitti_data_prep(root_path,
@@ -317,7 +317,6 @@ args = parser.parse_args()
 if __name__ == '__main__':
     from mmengine.registry import init_default_scope
     init_default_scope('mmdet3d')
-
     if args.dataset == 'kitti':
         if args.only_gt_database:
             create_groundtruth_database(

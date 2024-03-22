@@ -225,7 +225,11 @@ def create_groundtruth_database(dataset_class_name,
     if db_info_save_path is None:
         db_info_save_path = osp.join(data_path,
                                      f'{info_prefix}_dbinfos_train.pkl')
+    database_pts_path = osp.join(database_save_path, 'pts_dir')
+    database_img_path = osp.join(database_save_path, 'img_dir')
     mmengine.mkdir_or_exist(database_save_path)
+    mmengine.mkdir_or_exist(database_pts_path)
+    mmengine.mkdir_or_exist(database_img_path)
     all_db_infos = dict()
     if with_mask:
         coco = COCO(osp.join(data_path, mask_anno_path))
@@ -255,6 +259,33 @@ def create_groundtruth_database(dataset_class_name,
 
         num_obj = gt_boxes_3d.shape[0]
         point_indices = box_np_ops.points_in_rbbox(points, gt_boxes_3d)
+
+        # load multi-view image
+        input_img = {}
+        input_info = {}
+        for _cam in example['images']:
+            cam_info = example['images'][_cam]
+            if 'img_path' not in cam_info:
+                continue
+            _path = cam_info['img_path']
+            if dataset_class_name == 'KittiDataset':
+                _path = osp.join(data_path, 'training', 'image_2', _path)
+            elif dataset_class_name == 'NuScenesDataset':
+                _path = osp.join(data_path, 'samples', _cam, _path)
+            _img = mmcv.imread(_path, 'unchanged')
+            input_img[_cam] = _img
+
+            # obtain lidar to image transformation matrix
+            lidar2cam = np.array(cam_info['lidar2cam'])
+            intrinsic = np.array(cam_info['cam2img'])
+            viewpad = np.eye(4)
+            viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
+            lidar2img = (viewpad @ lidar2cam)
+
+            input_info[_cam]={
+                'lidar2img': lidar2img,              
+                'lidar2cam': lidar2cam,
+                'cam2img': viewpad}
 
         if with_mask:
             # prepare masks
@@ -288,9 +319,12 @@ def create_groundtruth_database(dataset_class_name,
                 gt_boxes, gt_masks, mask_inds, annos['img'])
 
         for i in range(num_obj):
-            filename = f'{image_idx}_{names[i]}_{i}.bin'
-            abs_filepath = osp.join(database_save_path, filename)
-            rel_filepath = osp.join(f'{info_prefix}_gt_database', filename)
+            pts_filename = f'{image_idx}_{names[i]}_{i}.bin'
+            img_filename = f'{image_idx}_{names[i]}_{i}.png'
+            abs_filepath = osp.join(database_pts_path, pts_filename)
+            abs_img_filepath = osp.join(database_img_path, img_filename)
+            rel_filepath = osp.join(f'{info_prefix}_gt_database', 'pts_dir', pts_filename)
+            rel_img_filepath = osp.join(f'{info_prefix}_gt_database', 'img_dir', img_filename)
 
             # save point clouds and image patches for each object
             gt_points = points[point_indices[:, i]]
@@ -308,11 +342,18 @@ def create_groundtruth_database(dataset_class_name,
             with open(abs_filepath, 'w') as f:
                 gt_points.tofile(f)
 
+            img_crop, crop_key, crop_depth = find_img_crop(annos['gt_bboxes_3d'][i].corners.numpy(), input_img, input_info,  points[point_indices[:, i]])
+            if img_crop is not None:
+                mmcv.imwrite(img_crop, abs_img_filepath)
+
             if (used_classes is None) or names[i] in used_classes:
                 db_info = {
                     'name': names[i],
                     'path': rel_filepath,
                     'image_idx': image_idx,
+                    'image_path': rel_img_filepath if img_crop is not None else '',
+                    'image_crop_key': crop_key if img_crop is not None else '',
+                    'image_crop_depth': crop_depth,
                     'gt_idx': i,
                     'box3d_lidar': gt_boxes_3d[i],
                     'num_points_in_gt': gt_points.shape[0],
@@ -338,6 +379,39 @@ def create_groundtruth_database(dataset_class_name,
 
     with open(db_info_save_path, 'wb') as f:
         pickle.dump(all_db_infos, f)
+
+
+def find_img_crop(gt_boxes_3d, input_img, input_info,  points):
+    coord_3d = np.concatenate([gt_boxes_3d, np.ones_like(gt_boxes_3d[..., :1])], -1)
+    coord_3d = coord_3d.squeeze(0)
+    max_crop, crop_key = None, None
+    crop_area, crop_depth = 0, 0
+
+    for _key in input_img:
+        lidar2img = np.array(input_info[_key]['lidar2img'])
+        coord_img = coord_3d @ lidar2img.T
+        coord_img[:,:2] /= coord_img[:,2,None]
+        image_shape = input_img[_key].shape
+        if (coord_img[2] <= 0).any():
+            continue
+        
+        avg_depth = coord_img[:,2].mean()
+        minxy = np.min(coord_img[:,:2], axis=-2)
+        maxxy = np.max(coord_img[:,:2], axis=-2)
+        bbox = np.concatenate([minxy, maxxy], axis=-1)
+        bbox[0::2] = np.clip(bbox[0::2], a_min=0, a_max=image_shape[1]-1)
+        bbox[1::2] = np.clip(bbox[1::2], a_min=0, a_max=image_shape[0]-1)
+        bbox = bbox.astype(int)
+        if ((bbox[2:]-bbox[:2]) <= 10).any():
+            continue
+
+        img_crop = input_img[_key][bbox[1]:bbox[3],bbox[0]:bbox[2]]
+        if img_crop.shape[0] * img_crop.shape[1] > crop_area:
+            max_crop = img_crop
+            crop_key = _key
+            crop_depth = avg_depth
+    
+    return max_crop, crop_key, crop_depth
 
 
 class GTDatabaseCreater:

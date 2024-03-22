@@ -185,10 +185,11 @@ class UnifiedDataBaseSampler(object):
             s_imgs_list = []
             count = 0
             for info in sampled:
+                print(info)
                 file_path = os.path.join(
                     self.data_root,
                     info['path']) if self.data_root else info['path']
-                results = dict(pts_filename=file_path)
+                results = dict(lidar_points=dict(lidar_path=file_path))
                 if 'nori_id' in info:
                     results['pts_nori_path'] = info['nori_id']
                 s_points = self.points_loader(results)['points']
