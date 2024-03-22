@@ -194,7 +194,7 @@ class UnifiedDataBaseSampler(object):
                     results['pts_nori_path'] = info['nori_id']
                 s_points = self.points_loader(results)['points']
                 s_points.translate(info['box3d_lidar'][:3])
-                idx_points = count * np.ones(len(s_points), dtype=np.int)
+                idx_points = count * np.ones(len(s_points), dtype=np.int64)
                 s_points_list.append(s_points)
                 s_idx_list.append(idx_points)
                 count += 1
