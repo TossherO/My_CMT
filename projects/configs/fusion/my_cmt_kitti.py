@@ -161,7 +161,7 @@ test_pipeline = [
                 translation_std=[0, 0, 0]),
             # dict(type='RandomFlip3D'),
             dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
-            # dict(type='NormalizeMultiviewImage', **img_norm_cfg),
+            dict(type='NormalizeMultiviewImage', **img_norm_cfg),
             dict(type='PadMultiViewImage', size_divisor=32)
         ]),
     dict(type='Pack3DDetInputs', keys=['points', 'img'])

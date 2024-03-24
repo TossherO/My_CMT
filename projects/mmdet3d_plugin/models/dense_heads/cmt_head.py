@@ -12,11 +12,10 @@ import torch
 import torch.nn as nn
 from mmengine.model import BaseModule
 from mmcv.cnn import ConvModule
-from mmdet.models.task_modules import build_assigner, build_sampler, build_bbox_coder
 from mmdet.models.utils import multi_apply
 from mmdet.utils import reduce_mean
 from mmdet.models.layers import inverse_sigmoid
-from mmdet3d.registry import MODELS
+from mmdet3d.registry import MODELS, TASK_UTILS
 from einops import rearrange
 import collections
 from projects.mmdet3d_plugin.core.bbox.util import normalize_bbox
@@ -261,7 +260,7 @@ class CmtHead(BaseModule):
         self.loss_cls = MODELS.build(loss_cls)
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_heatmap = MODELS.build(loss_heatmap)
-        self.bbox_coder = build_bbox_coder(bbox_coder)
+        self.bbox_coder = TASK_UTILS.build(bbox_coder)
         self.pc_range = self.bbox_coder.pc_range
         self.fp16_enabled = False
            
@@ -301,9 +300,9 @@ class CmtHead(BaseModule):
 
         # assigner
         if train_cfg:
-            self.assigner = build_assigner(train_cfg["assigner"])
+            self.assigner = TASK_UTILS.build(train_cfg["assigner"])
             sampler_cfg = dict(type='PseudoSampler')
-            self.sampler = build_sampler(sampler_cfg, context=self)
+            self.sampler = TASK_UTILS.build(sampler_cfg)
 
     def init_weights(self):
         super(CmtHead, self).init_weights()
