@@ -22,14 +22,14 @@ param_scheduler = [
     dict(
         type='CosineAnnealingLR',
         begin=0,
-        T_max=80,
-        end=80,
+        T_max=120,
+        end=120,
         by_epoch=True,
         eta_min=lr*5e-3,
         convert_to_iter_based=True)
 ]
 # training schedule for 1x
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=80, val_interval=5)
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=120, val_interval=5)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
@@ -385,10 +385,10 @@ model = dict(
 
 default_hooks = dict(
     logger=dict(type='LoggerHook', interval=50),
-    checkpoint=dict(type='CheckpointHook', interval=1),
+    checkpoint=dict(type='CheckpointHook', interval=5),
     changestrategy=dict(
         type='ChangeStrategyHook',
-        change_epoch=[81, -1],
+        change_epoch=[41, -1],
         change_strategy=['remove_GTSample', 'remove_DN'])
     )
 
