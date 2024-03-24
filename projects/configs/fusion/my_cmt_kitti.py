@@ -111,7 +111,6 @@ train_pipeline = [
         translation_std=[0.5, 0.5, 0.5]),
     dict(
         type='CustomRandomFlip3D',
-        sync_2d=False,
         flip_ratio_bev_horizontal=0.5),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
@@ -295,11 +294,13 @@ model = dict(
         use_conv_for_no_stride=True),
     pts_bbox_head=dict(
         type='CmtHead',
+        num_query=900,
         in_channels=512,
         hidden_dim=256,
         downsample_scale=8,
+        scalar=10,
         common_heads=dict(center=(2, 2), height=(1, 2), dim=(3, 2), rot=(2, 2)),
-         tasks=[
+        tasks=[
             dict(num_class=10, class_names=['Pedestrian', 'Cyclist', 'Car']),
         ],
         bbox_coder=dict(
@@ -384,7 +385,12 @@ model = dict(
 
 default_hooks = dict(
     logger=dict(type='LoggerHook', interval=50),
-    checkpoint=dict(type='CheckpointHook', interval=1))
+    checkpoint=dict(type='CheckpointHook', interval=1),
+    changestrategy=dict(
+        type='ChangeStrategyHook',
+        change_epoch=[81, -1],
+        change_strategy=['remove_GTSample', 'remove_DN'])
+    )
 
 load_from='models/nuim_r50.pth'
 

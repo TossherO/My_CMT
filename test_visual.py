@@ -21,7 +21,7 @@ runner = Runner.from_cfg(cfg)
 visualizer1 = Det3DLocalVisualizer()
 visualizer2 = Det3DLocalVisualizer()
 
-print(len(runner.train_dataloader))
+# runner.train_dataloader.dataset.dataset.pipeline.transforms.pop(3)
 data_batch = next(iter(runner.train_dataloader))
 data_batch = runner.model.data_preprocessor(data_batch, training=True)
 batch_inputs_dict = data_batch['inputs']

@@ -199,6 +199,7 @@ class CmtHead(BaseModule):
                  depth_num=64,
                  norm_bbox=True,
                  downsample_scale=8,
+                 with_dn=True,
                  scalar=10,
                  noise_scale=1.0,
                  noise_trans=0.0,
@@ -250,6 +251,7 @@ class CmtHead(BaseModule):
         self.depth_num = depth_num
         self.norm_bbox = norm_bbox
         self.downsample_scale = downsample_scale
+        self.with_dn = with_dn
         self.scalar = scalar
         self.bbox_noise_scale = noise_scale
         self.bbox_noise_trans = noise_trans
@@ -323,7 +325,7 @@ class CmtHead(BaseModule):
         return coord_base
 
     def prepare_for_dn(self, batch_size, reference_points, img_metas):
-        if self.training:
+        if self.training and self.with_dn:
             targets = [torch.cat((img_meta['gt_bboxes_3d'].gravity_center, img_meta['gt_bboxes_3d'].tensor[:, 3:]),dim=1) for img_meta in img_metas ]
             labels = [img_meta['gt_labels_3d'] for img_meta in img_metas ]
             known = [(torch.ones_like(t)).cuda() for t in labels]
@@ -864,6 +866,9 @@ class CmtHead(BaseModule):
             loss_dict[f'd{num_dec_layer}.loss_bbox'] = loss_bbox_i
             num_dec_layer += 1
         
+        if self.with_dn == False:
+            return loss_dict
+
         dn_pred_bboxes, dn_pred_logits = collections.defaultdict(list), collections.defaultdict(list)
         dn_mask_dicts = collections.defaultdict(list)
         for task_id, preds_dict in enumerate(preds_dicts, 0):

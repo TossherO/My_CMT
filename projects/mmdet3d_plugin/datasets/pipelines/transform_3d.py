@@ -615,7 +615,7 @@ class CustomRandomFlip3D(BaseTransform):
     def __repr__(self):
         """str: Return a string that describes the module."""
         repr_str = self.__class__.__name__
-        repr_str += f'(sync_2d={self.sync_2d},'
+        repr_str += f'(flip_ratio_bev_horizontal={self.flip_ratio_bev_horizontal},' 
         repr_str += f' flip_ratio_bev_vertical={self.flip_ratio_bev_vertical})'
         return repr_str
 
