@@ -44,7 +44,7 @@ auto_scale_lr = dict(enable=False, base_batch_size=16)
 dataset_type = 'KittiDataset'
 data_root = 'data/kitti/'
 class_names = ['Pedestrian', 'Cyclist', 'Car']
-point_cloud_range = [0, -40, -3, 70.4, 40, 1]
+point_cloud_range = [0, -40, -3, 80, 40, 1]
 input_modality = dict(use_lidar=True, use_camera=True)
 metainfo = dict(classes=class_names)
 backend_args = None
@@ -57,8 +57,8 @@ ida_aug_conf = {
         "final_dim": (320, 960),
         "bot_pct_lim": (0.0, 0.0),
         "rot_lim": (0.0, 0.0),
-        "H": 370,
-        "W": 1224,
+        "H": 375,
+        "W": 1242,
         "rand_flip": True,
     }
 
@@ -150,7 +150,7 @@ test_pipeline = [
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(
         type='MultiScaleFlipAug3D',
-        img_scale=(1333, 800),
+        img_scale=(1000, 800),
         pts_scale_ratio=1,
         flip=False,
         transforms=[

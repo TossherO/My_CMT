@@ -22,12 +22,11 @@ visualizer1 = Det3DLocalVisualizer()
 visualizer2 = Det3DLocalVisualizer()
 visualizer3 = Det3DLocalVisualizer()
 
-# runner.train_dataloader.dataset.dataset.pipeline.transforms.pop(3)
-# 从models/epoch_80.pth加载模型
+runner.train_dataloader.dataset.dataset.pipeline.transforms.pop(3)
 runner.load_checkpoint('models/epoch_80.pth')
 runner.model.eval()
-count = 100
-for data_batch in runner.val_dataloader:
+count = 1
+for data_batch in runner.train_dataloader:
     if count == 0:
         break
     count -= 1
@@ -37,15 +36,17 @@ batch_data_samples = data_batch['data_samples']
 imgs = batch_inputs_dict.get('imgs', None)
 points = batch_inputs_dict.get('points', None)
 img_metas = [item.metainfo for item in batch_data_samples]
-gt_bboxes_3d = [item.get('eval_ann_info')['gt_bboxes_3d'] for item in batch_data_samples]
-gt_labels_3d = [item.get('eval_ann_info')['gt_labels_3d'] for item in batch_data_samples]
+# gt_bboxes_3d = [item.get('eval_ann_info')['gt_bboxes_3d'] for item in batch_data_samples]
+# gt_labels_3d = [item.get('eval_ann_info')['gt_labels_3d'] for item in batch_data_samples]
+gt_bboxes_3d = [item.get('gt_instances_3d')['bboxes_3d'] for item in batch_data_samples]
+gt_labels_3d = [item.get('gt_instances_3d')['labels_3d'] for item in batch_data_samples]
 
 point = points[0].cpu().numpy()
 bboxes_3d = gt_bboxes_3d[0]
 bbox_color = [(0, 255, 0)] * bboxes_3d.shape[0]
 input_meta = {'lidar2img':img_metas[0]['lidar2img'][0]}
 img = imgs[0][0].permute(1, 2, 0).cpu().numpy()
-img = mmcv.imdenormalize(img, mean=np.array([103.530, 116.280, 123.675]), std=np.array([57.375, 57.120, 58.395]), to_bgr=False)
+img = mmcv.imdenormalize(img, mean=np.array([103.530, 116.280, 123.675]), std=np.array([57.375, 57.120, 58.395]), to_bgr=True)
 
 if isinstance(data_batch, dict):
     outputs = runner.model(**data_batch, mode='predict')

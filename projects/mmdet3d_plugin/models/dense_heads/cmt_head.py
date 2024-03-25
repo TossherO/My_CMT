@@ -316,7 +316,7 @@ class CmtHead(BaseModule):
             cfg['grid_size'][0] // self.downsample_scale
         )
         meshgrid = [[0, x_size - 1, x_size], [0, y_size - 1, y_size]]
-        batch_y, batch_x = torch.meshgrid(*[torch.linspace(it[0], it[1], it[2]) for it in meshgrid])
+        batch_x, batch_y = torch.meshgrid(*[torch.linspace(it[0], it[1], it[2]) for it in meshgrid])
         batch_x = (batch_x + 0.5) / x_size
         batch_y = (batch_y + 0.5) / y_size
         coord_base = torch.cat([batch_x[None], batch_y[None]], dim=0)
@@ -693,9 +693,9 @@ class CmtHead(BaseModule):
         bbox_weights = bbox_weights * bbox_weights.new_tensor(self.train_cfg.code_weights)[None, :]
 
         loss_bbox = self.loss_bbox(
-            pred_bboxes_flatten[isnotnan, :10],
-            normalized_bbox_targets[isnotnan, :10],
-            bbox_weights[isnotnan, :10],
+            pred_bboxes_flatten[isnotnan, :],
+            normalized_bbox_targets[isnotnan, :],
+            bbox_weights[isnotnan, :],
             avg_factor=num_total_pos
         )
 
@@ -791,7 +791,7 @@ class CmtHead(BaseModule):
         bbox_weights = bbox_weights * bbox_weights.new_tensor(self.train_cfg.code_weights)[None, :]
         # bbox_weights[:, 6:8] = 0
         loss_bbox = self.loss_bbox(
-                pred_bboxes[isnotnan, :10], normalized_bbox_targets[isnotnan, :10], bbox_weights[isnotnan, :10], avg_factor=num_tgt)
+                pred_bboxes[isnotnan, :], normalized_bbox_targets[isnotnan, :], bbox_weights[isnotnan, :], avg_factor=num_tgt)
  
         loss_cls = torch.nan_to_num(loss_cls)
         loss_bbox = torch.nan_to_num(loss_bbox)
