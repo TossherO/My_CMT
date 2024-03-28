@@ -22,24 +22,24 @@ visualizer1 = Det3DLocalVisualizer()
 visualizer2 = Det3DLocalVisualizer()
 visualizer3 = Det3DLocalVisualizer()
 
-runner.train_dataloader.dataset.dataset.pipeline.transforms.pop(3)
-runner.load_checkpoint('models/epoch_80.pth')
+# runner.train_dataloader.dataset.dataset.pipeline.transforms.pop(3)
+runner.load_checkpoint('models/epoch_120.pth')
 runner.model.eval()
-count = 1
-for data_batch in runner.train_dataloader:
+count = 15
+for data_batch in runner.test_dataloader:
     if count == 0:
         break
     count -= 1
-data_batch = runner.model.data_preprocessor(data_batch, training=True)
+data_batch = runner.model.data_preprocessor(data_batch, training=False)
 batch_inputs_dict = data_batch['inputs']
 batch_data_samples = data_batch['data_samples']
 imgs = batch_inputs_dict.get('imgs', None)
 points = batch_inputs_dict.get('points', None)
 img_metas = [item.metainfo for item in batch_data_samples]
-# gt_bboxes_3d = [item.get('eval_ann_info')['gt_bboxes_3d'] for item in batch_data_samples]
-# gt_labels_3d = [item.get('eval_ann_info')['gt_labels_3d'] for item in batch_data_samples]
-gt_bboxes_3d = [item.get('gt_instances_3d')['bboxes_3d'] for item in batch_data_samples]
-gt_labels_3d = [item.get('gt_instances_3d')['labels_3d'] for item in batch_data_samples]
+gt_bboxes_3d = [item.get('eval_ann_info')['gt_bboxes_3d'] for item in batch_data_samples]
+gt_labels_3d = [item.get('eval_ann_info')['gt_labels_3d'] for item in batch_data_samples]
+# gt_bboxes_3d = [item.get('gt_instances_3d')['bboxes_3d'] for item in batch_data_samples]
+# gt_labels_3d = [item.get('gt_instances_3d')['labels_3d'] for item in batch_data_samples]
 
 point = points[0].cpu().numpy()
 bboxes_3d = gt_bboxes_3d[0]
@@ -56,8 +56,10 @@ else:
     raise TypeError()
 runner.val_evaluator.process(data_samples=outputs, data_batch=data_batch)
 
-bboxes_3d_pre = outputs[0].get('pred_instances_3d').get('bboxes_3d')[:10]
+bboxes_3d_pre = outputs[0].get('pred_instances_3d').get('bboxes_3d')[:20]
+scores_3d_pre = outputs[0].get('pred_instances_3d').get('scores_3d')[:20]
 bbox_color_pre = [(0, 255, 0)] * bboxes_3d_pre.shape[0]
+print(scores_3d_pre)
 
 visualizer1.set_points(point)
 visualizer1.draw_bboxes_3d(bboxes_3d, bbox_color)
