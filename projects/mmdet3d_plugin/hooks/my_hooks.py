@@ -14,7 +14,7 @@ class ChangeStrategyHook(Hook):
         self.logger = MMLogger.get_current_instance()
 
     def before_train_epoch(self, runner) -> None:
-        self.epoch += 1
+        self.epoch = runner.epoch + 1
         self.logger.info('Epoch %d, change_epoch: %s, change_strategy: %s' % (self.epoch, self.change_epoch, self.change_strategy))
         for i, epoch in enumerate(self.change_epoch):
             if self.epoch == epoch:
@@ -33,8 +33,15 @@ class ChangeStrategyHook(Hook):
             self.logger.info('UnifiedObjectSample not found in pipeline')
 
     def remove_DN(self, runner):
-        if runner.model.pts_bbox_head.with_dn:
-            runner.model.pts_bbox_head.with_dn = False
-            self.logger.info('Remove DN in pts_bbox_head')
+        if hasattr(runner.model, 'module'):
+            if runner.model.module.pts_bbox_head.with_dn:
+                runner.model.module.pts_bbox_head.with_dn = False
+                self.logger.info('Remove DN in pts_bbox_head(module)')
+            else:
+                self.logger.info('Cannot remove DN')
         else:
-            self.logger.info('Cannot remove DN')
+            if runner.model.pts_bbox_head.with_dn:
+                runner.model.pts_bbox_head.with_dn = False
+                self.logger.info('Remove DN in pts_bbox_head')
+            else:
+                self.logger.info('Cannot remove DN')

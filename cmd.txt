@@ -2,7 +2,7 @@ docker run --gpus all --shm-size=8g -it -v /media/helloalone/新加卷/ubuntu_co
 
 python train.py projects/configs/fusion/my_cmt_kitti.py --auto-scale-lr
 
-./dist_train.sh projects/configs/fusion/my_cmt_kitti.py 2 --auto-scale-lr
+./dist_train.sh projects/configs/fusion/my_cmt_kitti.py 4 --auto-scale-lr
 
 python test.py projects/configs/fusion/my_cmt_kitti.py models/epoch_120.pth
 

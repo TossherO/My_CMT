@@ -18,7 +18,7 @@ optim_wrapper = dict(
 )
 
 param_scheduler = [
-    dict(type='LinearLR', start_factor=0.1, by_epoch=False, begin=0, end=1000),
+    # dict(type='LinearLR', start_factor=0.1, by_epoch=False, begin=0, end=1000),
     dict(
         type='CosineAnnealingLR',
         begin=0,
@@ -392,10 +392,10 @@ default_hooks = dict(
     checkpoint=dict(type='CheckpointHook', interval=5),
     changestrategy=dict(
         type='ChangeStrategyHook',
-        change_epoch=[81, 1],
+        change_epoch=[1, 1],
         change_strategy=['remove_GTSample', 'remove_DN'])
     )
 
-load_from='models/nuim_r50.pth'
+load_from='models/test.pth'
 
 # resume = True
