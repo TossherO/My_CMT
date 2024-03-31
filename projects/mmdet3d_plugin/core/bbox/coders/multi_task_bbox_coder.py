@@ -50,7 +50,7 @@ class MultiTaskBBoxCoder(BaseBBoxCoder):
                 shape [num_query, cls_out_channels]. Note \
                 cls_out_channels should includes background.
             bbox_preds (Tensor): Outputs from the regression \
-                head with normalized coordinate format (cx, cy, w, l, cz, h, rot_sine, rot_cosine, vx, vy). \
+                head with normalized coordinate format (cx, cy, cz, w, l, h, rot_sine, rot_cosine, vx, vy). \
                 Shape [num_query, 9].
         Returns:
             list[dict]: Decoded boxes.
@@ -106,7 +106,7 @@ class MultiTaskBBoxCoder(BaseBBoxCoder):
                 shape [nb_dec, bs, num_query, cls_out_channels]. Note \
                 cls_out_channels should includes background.
             all_bbox_preds (Tensor): Sigmoid outputs from the regression \
-                head with normalized coordinate format (cx, cy, w, l, cz, h, rot_sine, rot_cosine, vx, vy). \
+                head with normalized coordinate format (cx, cy, cz, w, l, h, rot_sine, rot_cosine, vx, vy). \
                 Shape [nb_dec, bs, num_query, 9].
         Returns:
             list[dict]: Decoded boxes.
