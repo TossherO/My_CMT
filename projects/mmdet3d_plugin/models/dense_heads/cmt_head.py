@@ -914,11 +914,6 @@ class CmtHead(BaseModule):
             preds = preds_dicts[i]
             bboxes = preds['bboxes']
             bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 5] * 0.5
-            
-            # 对于所有car的预测，将其预测框的长度*1.4
-            # is_car = (preds['labels'] == 2)
-            # bboxes[is_car, 3] = bboxes[is_car, 3] * 1.4
-
             bboxes = img_metas[i]['box_type_3d'](bboxes, bboxes.size(-1))
             scores = preds['scores']
             labels = preds['labels']

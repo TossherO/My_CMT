@@ -111,7 +111,7 @@ class NormalizeMultiviewImage(BaseTransform):
 
 
 @TRANSFORMS.register_module()
-class ResizeCropFlipImage(object):
+class ResizeCropFlipImage(BaseTransform):
     """Random resize, Crop and flip the image
     Args:
         size (tuple, optional): Fixed padding size.
@@ -123,7 +123,7 @@ class ResizeCropFlipImage(object):
         self.pic_wise = pic_wise
         
 
-    def __call__(self, results):
+    def transform(self, results):
         """Call function to pad images, masks, semantic segmentation maps.
         Args:
             results (dict): Result dict from loading pipeline.
@@ -135,7 +135,7 @@ class ResizeCropFlipImage(object):
         N = len(imgs)
         new_imgs = []
         new_depths = []
-        resize, resize_dims, crop, flip, rotate = self._sample_augmentation()
+        resize, resize_dims, crop, flip, rotate = self._sample_augmentation(imgs[0])
         for i in range(N):
             post_rot = torch.eye(2)
             post_tran = torch.zeros(2)
@@ -143,7 +143,7 @@ class ResizeCropFlipImage(object):
 
             # augmentation (resize, crop, horizontal flip, rotate)
             if self.pic_wise:
-                resize, resize_dims, crop, flip, rotate = self._sample_augmentation()
+                resize, resize_dims, crop, flip, rotate = self._sample_augmentation(img)
             img, post_rot2, post_tran2 = self._img_transform(
                 img,
                 post_rot,
@@ -229,8 +229,8 @@ class ResizeCropFlipImage(object):
 
         return img, post_rot, post_tran
 
-    def _sample_augmentation(self):
-        H, W = self.data_aug_conf["H"], self.data_aug_conf["W"]
+    def _sample_augmentation(self, img):
+        H, W = img.shape[:2]
         fH, fW = self.data_aug_conf["final_dim"]
         if self.training:
             resize = np.random.uniform(*self.data_aug_conf["resize_lim"])
