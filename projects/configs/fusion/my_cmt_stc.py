@@ -53,7 +53,7 @@ img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[57.375, 57.120, 58.395], to_rgb=False)
     
 ida_aug_conf = {
-    "resize_lim": (0.5, 0.7),
+    "resize_lim": (0.5, 0.65),
     "final_dim": (480, 960),
     "bot_pct_lim": (0.0, 0.0),
     "rot_lim": (0.0, 0.0),

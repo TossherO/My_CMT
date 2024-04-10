@@ -14,7 +14,7 @@ from mmengine.structures import InstanceData
 from mmdet3d.visualization import Det3DLocalVisualizer
 from mmdet3d.structures import LiDARInstance3DBoxes
 
-cfg = Config.fromfile('projects/configs/fusion/my_cmt_kitti_pre.py')
+cfg = Config.fromfile('projects/configs/fusion/my_cmt_kitti_stc.py')
 # cfg = Config.fromfile('../mmdetection3d/projects/BEVFusion/configs/my_bevfusion.py')
 cfg.work_dir = osp.abspath('./work_dirs')
 runner = Runner.from_cfg(cfg)

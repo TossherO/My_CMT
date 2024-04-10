@@ -14,7 +14,7 @@ from mmdet3d.structures import LiDARInstance3DBoxes, CameraInstance3DBoxes
 visualizer1 = Det3DLocalVisualizer()
 visualizer2 = Det3DLocalVisualizer()
 
-infos = mmengine.load('./data/kitti/kitti_infos_trainval2.pkl')
+infos = mmengine.load('./data/kitti_stc_fusion_infos_train.pkl')
 
 idx = 0
 info = infos['data_list'][idx]
@@ -22,15 +22,14 @@ info = infos['data_list'][idx]
 cam2img = []
 lidar2cam = []
 lidar2img = []
-xyz2zxy = np.array([[0, 0, 1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
-for cam in ['CAM2']:
+for cam in ['left']:
     cam2img.append(np.array(info['images'][cam]['cam2img']))
     lidar2cam.append(np.array(info['images'][cam]['lidar2cam']))
-    lidar2img.append(np.array(info['images'][cam]['cam2img']) @ np.array(info['images'][cam]['lidar2cam']))
+    lidar2img.append(np.array(info['images'][cam]['lidar2img']))
 
-cam = 'CAM2'
-img_path = './data/kitti/' + info['images'][cam]['img_path']
-points_path = './data/kitti/' + info['lidar_points']['lidar_path']
+cam = 'left'
+img_path = './data/' + info['images'][cam]['img_path']
+points_path = './data/' + info['lidar_points']['lidar_path']
 input_meta = {'lidar2img': np.array(info['images'][cam]['lidar2img'])}
 
 img = cv2.imread(img_path)

@@ -20,6 +20,7 @@ from mmengine.fileio import get
 from typing import Any, Dict
 import mmengine.fileio as fileio
 from mmdet3d.structures.ops import box_np_ops
+from scipy.spatial.transform import Rotation
 
 
 @TRANSFORMS.register_module()
@@ -915,7 +916,7 @@ class LoadMultiViewImageFromFilesKitti(LoadImageFromFile):
     
 
 @TRANSFORMS.register_module()
-class UnifiedObjectSample(object):
+class UnifiedObjectSample(BaseTransform):
     """Sample GT objects to the data.
 
     Args:
@@ -950,7 +951,7 @@ class UnifiedObjectSample(object):
         points = points[np.logical_not(masks.any(-1))]
         return points
 
-    def __call__(self, input_dict):
+    def transform(self, input_dict):
         """Call function to sample ground truth objects to the data.
 
         Args:
@@ -1119,3 +1120,37 @@ class UnifiedObjectSample(object):
         repr_str += f' classes={self.sampler_cfg.classes},'
         repr_str += f' sample_groups={self.sampler_cfg.sample_groups}'
         return repr_str
+    
+
+@TRANSFORMS.register_module()
+class AddCalibNoise(BaseTransform):
+    """Add noise to the calibration matrix.
+
+    Args:
+        rot_std (float): Standard deviation of the rotation noise.
+        trans_std (float): Standard deviation of the translation noise.
+    """
+
+    def __init__(self, rot_std = [0.0, 0.0, 0.0], trans_std = [0.0, 0.0, 0.0]):
+        self.rot_std = rot_std
+        self.trans_std = trans_std
+
+    def transform(self, input_dict):
+        """Call function to add noise to the calibration matrix.
+
+        Args:
+            input_dict (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Results after adding noise to the calibration matrix, \
+                'lidar2cam' and 'lidar2img' keys are updated in the result dict.
+        """
+        noise_rot = np.random.normal(scale=self.rot_std, size=3)
+        noise_tans = np.random.normal(scale=self.trans_std, size=3)
+        noise_matrix = np.eye(4)
+        noise_matrix[:3, :3] = Rotation.from_euler('xyz', noise_rot, degrees=True).as_matrix()
+        noise_matrix[:3, -1] = noise_tans
+        for i in range(len(input_dict["img"])):
+            input_dict["lidar2cam"][i] = input_dict["lidar2cam"][i] @ noise_matrix
+            input_dict["lidar2img"][i] = input_dict["cam2img"][i] @ input_dict["lidar2cam"][i]
+        return input_dict

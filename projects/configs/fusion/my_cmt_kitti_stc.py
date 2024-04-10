@@ -11,7 +11,7 @@ optim_wrapper = dict(
     optimizer=dict(type='AdamW', lr=lr, weight_decay=0.001),
     paramwise_cfg=dict(
         custom_keys={
-            'img_backbone': dict(lr_mult=0.01, decay_mult=5),
+            'img_backbone': dict(lr_mult=0.1, decay_mult=5),
             'img_neck': dict(lr_mult=0.1)
         }),
     clip_grad=dict(max_norm=35, norm_type=2),
@@ -42,7 +42,7 @@ auto_scale_lr = dict(enable=False, base_batch_size=16)
 
 # dataset settings
 dataset_type = 'STCrowdDataset'
-data_root = 'data/STCrowd/'
+data_root = 'data/'
 class_names = ['person']
 point_cloud_range = [0, -18, -5, 36, 18, 1]
 input_modality = dict(use_lidar=True, use_camera=True)
@@ -53,8 +53,8 @@ img_norm_cfg = dict(
     mean=[103.530, 116.280, 123.675], std=[57.375, 57.120, 58.395], to_rgb=False)
     
 ida_aug_conf = {
-    "resize_lim": (0.6, 0.8),
-    "final_dim": (640, 1120),
+    "resize_lim": (0.5, 0.65),
+    "final_dim": (480, 960),
     "bot_pct_lim": (0.0, 0.0),
     "rot_lim": (0.0, 0.0),
     "rand_flip": True,
@@ -74,14 +74,13 @@ train_pipeline = [
         backend_args=backend_args
     ),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
+    dict(type='AddCalibNoise', rot_std = [0.5, 0.5, 0.5], trans_std = [0.1, 0.1, 0.1]),
     dict(
         type='GlobalRotScaleTransAll',
         scale_ratio_range=[0.9, 1.1],
         rot_range=[-0.78539816, 0.78539816],
         translation_std=[0.5, 0.5, 0.5]),
-    dict(
-        type='CustomRandomFlip3D',
-        flip_ratio_bev_horizontal=0.5),
+    dict(type='CustomRandomFlip3D', flip_ratio_bev_horizontal=0.5),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
@@ -140,7 +139,7 @@ train_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         data_prefix=dict(pts='', img=''),
-        ann_file='STCrowd_infos_train.pkl',
+        ann_file='kitti_stc_fusion_infos_train.pkl',
         pipeline=train_pipeline,
         modality=input_modality,
         test_mode=False,
@@ -156,8 +155,8 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts='', img=''),
-        ann_file='STCrowd_infos_val.pkl',
+        data_prefix=dict(pts='STCrowd/', img='STCrowd/'),
+        ann_file='STCrowd/STCrowd_infos_val.pkl',
         pipeline=test_pipeline,
         modality=input_modality,
         test_mode=True,
@@ -173,8 +172,8 @@ test_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
-        data_prefix=dict(pts='', img=''),
-        ann_file='STCrowd_infos_val.pkl',
+        data_prefix=dict(pts='STCrowd/', img='STCrowd/'),
+        ann_file='STCrowd/STCrowd_infos_val.pkl',
         pipeline=test_pipeline,
         modality=input_modality,
         test_mode=True,
@@ -184,12 +183,12 @@ test_dataloader = dict(
 
 val_evaluator = dict(
     type='KittiMetric',
-    ann_file=data_root + 'STCrowd_infos_val.pkl',
+    ann_file=data_root + 'STCrowd/STCrowd_infos_val.pkl',
     metric='bbox',
     backend_args=backend_args)
 test_evaluator = dict(
     type='KittiMetric',
-    ann_file=data_root + 'STCrowd_infos_val.pkl',
+    ann_file=data_root + 'STCrowd/STCrowd_infos_val.pkl',
     metric='bbox',
     backend_args=backend_args)
 
@@ -276,7 +275,7 @@ model = dict(
         ],
         bbox_coder=dict(
             type='MultiTaskBBoxCoder',
-            post_center_range=[-10.0, -30.0, -6.0, 50.0, 30.0, 2.0],
+            post_center_range=[-5.0, -25.0, -6.0, 45.0, 25.0, 2.0],
             pc_range=point_cloud_range,
             max_num=100,
             voxel_size=voxel_size,
