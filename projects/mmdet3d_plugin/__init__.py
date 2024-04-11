@@ -5,3 +5,4 @@ from .datasets import *
 from .mmcv_custom import *
 from .models import *
 from .hooks import *
+from .metrics import *

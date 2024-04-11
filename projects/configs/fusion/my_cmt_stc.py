@@ -43,7 +43,7 @@ auto_scale_lr = dict(enable=False, base_batch_size=16)
 # dataset settings
 dataset_type = 'STCrowdDataset'
 data_root = 'data/STCrowd/'
-class_names = ['person']
+class_names = ['Pedestrian']
 point_cloud_range = [0, -18, -5, 36, 18, 1]
 input_modality = dict(use_lidar=True, use_camera=True)
 metainfo = dict(classes=class_names)

@@ -59,10 +59,12 @@ def load_file(path_root,load_dict):
             instance['bbox_3d'] = [x, y, z-h/2, l, w, h, yaw]
             instance['bbox_label_3d'] = 0
             instance['depth'] = np.sqrt(x**2 + y**2 + z**2)
+            instance['alpha'] = -np.arctan2(-y, x) + yaw
             instance['num_lidar_pts'] = item['pointCount']
             instance['difficulty'] = 0
             instance['truncated'] = 0.0
             instance['occluded'] = item['occlusion']
+            instance['score'] = 0.0
             instance['group_id'] = 0
             instances.append(instance)
             
@@ -86,7 +88,7 @@ def create_data_info(data_path, file_list, pkl_prefix='STCrowd'):
         info = load_file(data_path, load_dict)    
         if info:
             data_list = data_list + info
-    metainfo = {'categories': {'person': 0}, 'dataset': 'STCrowd', 'info_version': '1.0'}
+    metainfo = {'categories': {'Pedestrian': 0}, 'dataset': 'STCrowd', 'info_version': '1.0'}
     return {'metainfo': metainfo, 'data_list': data_list}
 
 

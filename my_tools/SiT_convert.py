@@ -115,7 +115,7 @@ def create_data_info(path_root, scene_file_list):
         info = load_file(path_root, scene_file, idx)    
         if info:
             data_list = data_list + info
-    metainfo = {'categories': {'person': 0}, 'dataset': 'SiT', 'info_version': '1.0'}
+    metainfo = {'categories': {'Pedestrian': 0}, 'dataset': 'SiT', 'info_version': '1.0'}
     return {'metainfo': metainfo, 'data_list': data_list}
 
 

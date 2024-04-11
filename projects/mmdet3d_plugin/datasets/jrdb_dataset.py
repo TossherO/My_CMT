@@ -54,7 +54,7 @@ class JRDBDataset(Det3DDataset):
     """
     # TODO: use full classes of kitti
     METAINFO = {
-        'classes': ('person'),
+        'classes': ('Pedestrian'),
         'palette': [(106, 0, 228)]
     }
 

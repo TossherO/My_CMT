@@ -11,7 +11,7 @@ def main():
     info1 = mmengine.load('./data/kitti/kitti_infos_trainval2.pkl')
     info2 = mmengine.load('./data/STCrowd/STCrowd_infos_train.pkl')
     filename = './data/kitti_stc_fusion_infos_train.pkl'
-    metainfo = {'categories': {'person': 0}, 'dataset': 'Kitti_STCrowd', 'info_version': '1.0'}
+    metainfo = {'categories': {'Pedestrian': 0}, 'dataset': 'Kitti_STCrowd', 'info_version': '1.0'}
     count = 0
     new_data_list = []
 
